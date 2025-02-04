@@ -25,14 +25,27 @@ Partial Class Form1
         MenuStrip1 = New MenuStrip()
         OpenToolStripMenuItem = New ToolStripMenuItem()
         OpenToolStripMenuItem1 = New ToolStripMenuItem()
+        TestCardParametersToolStripMenuItem = New ToolStripMenuItem()
+        MakeTestCardToolStripMenuItem = New ToolStripMenuItem()
+        DXFMetricsToolStripMenuItem = New ToolStripMenuItem()
         ExitToolStripMenuItem = New ToolStripMenuItem()
+        DebugToolStripMenuItem = New ToolStripMenuItem()
+        HEXDUMPONToolStripMenuItem = New ToolStripMenuItem()
+        HEXDUMPOFFToolStripMenuItem = New ToolStripMenuItem()
+        DEBUGONToolStripMenuItem = New ToolStripMenuItem()
+        DEBUGOFFToolStripMenuItem = New ToolStripMenuItem()
+        TestToolStripMenuItem = New ToolStripMenuItem()
+        WordAccessToolStripMenuItem = New ToolStripMenuItem()
+        TestIEEEToLeetroFpConversionToolStripMenuItem = New ToolStripMenuItem()
+        TextTestToolStripMenuItem = New ToolStripMenuItem()
         TextBox1 = New TextBox()
+        ProgressBar1 = New ProgressBar()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
         ' MenuStrip1
         ' 
-        MenuStrip1.Items.AddRange(New ToolStripItem() {OpenToolStripMenuItem})
+        MenuStrip1.Items.AddRange(New ToolStripItem() {OpenToolStripMenuItem, DebugToolStripMenuItem, TestToolStripMenuItem})
         MenuStrip1.Location = New Point(0, 0)
         MenuStrip1.Name = "MenuStrip1"
         MenuStrip1.Size = New Size(1047, 24)
@@ -41,7 +54,7 @@ Partial Class Form1
         ' 
         ' OpenToolStripMenuItem
         ' 
-        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {OpenToolStripMenuItem1, ExitToolStripMenuItem})
+        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {OpenToolStripMenuItem1, TestCardParametersToolStripMenuItem, MakeTestCardToolStripMenuItem, DXFMetricsToolStripMenuItem, ExitToolStripMenuItem})
         OpenToolStripMenuItem.Name = "OpenToolStripMenuItem"
         OpenToolStripMenuItem.Size = New Size(37, 20)
         OpenToolStripMenuItem.Text = "File"
@@ -49,32 +62,117 @@ Partial Class Form1
         ' OpenToolStripMenuItem1
         ' 
         OpenToolStripMenuItem1.Name = "OpenToolStripMenuItem1"
-        OpenToolStripMenuItem1.Size = New Size(103, 22)
+        OpenToolStripMenuItem1.Size = New Size(183, 22)
         OpenToolStripMenuItem1.Text = "Open"
+        ' 
+        ' TestCardParametersToolStripMenuItem
+        ' 
+        TestCardParametersToolStripMenuItem.Name = "TestCardParametersToolStripMenuItem"
+        TestCardParametersToolStripMenuItem.Size = New Size(183, 22)
+        TestCardParametersToolStripMenuItem.Text = "Test card parameters"
+        ' 
+        ' MakeTestCardToolStripMenuItem
+        ' 
+        MakeTestCardToolStripMenuItem.Name = "MakeTestCardToolStripMenuItem"
+        MakeTestCardToolStripMenuItem.Size = New Size(183, 22)
+        MakeTestCardToolStripMenuItem.Text = "Make Test card"
+        ' 
+        ' DXFMetricsToolStripMenuItem
+        ' 
+        DXFMetricsToolStripMenuItem.Name = "DXFMetricsToolStripMenuItem"
+        DXFMetricsToolStripMenuItem.Size = New Size(183, 22)
+        DXFMetricsToolStripMenuItem.Text = "DXF metrics"
         ' 
         ' ExitToolStripMenuItem
         ' 
         ExitToolStripMenuItem.Name = "ExitToolStripMenuItem"
-        ExitToolStripMenuItem.Size = New Size(103, 22)
+        ExitToolStripMenuItem.Size = New Size(183, 22)
         ExitToolStripMenuItem.Text = "Exit"
+        ' 
+        ' DebugToolStripMenuItem
+        ' 
+        DebugToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {HEXDUMPONToolStripMenuItem, HEXDUMPOFFToolStripMenuItem, DEBUGONToolStripMenuItem, DEBUGOFFToolStripMenuItem})
+        DebugToolStripMenuItem.Name = "DebugToolStripMenuItem"
+        DebugToolStripMenuItem.Size = New Size(54, 20)
+        DebugToolStripMenuItem.Text = "Debug"
+        ' 
+        ' HEXDUMPONToolStripMenuItem
+        ' 
+        HEXDUMPONToolStripMenuItem.Name = "HEXDUMPONToolStripMenuItem"
+        HEXDUMPONToolStripMenuItem.Size = New Size(154, 22)
+        HEXDUMPONToolStripMenuItem.Text = "HEXDUMP ON"
+        ' 
+        ' HEXDUMPOFFToolStripMenuItem
+        ' 
+        HEXDUMPOFFToolStripMenuItem.Name = "HEXDUMPOFFToolStripMenuItem"
+        HEXDUMPOFFToolStripMenuItem.Size = New Size(154, 22)
+        HEXDUMPOFFToolStripMenuItem.Text = "HEXDUMP OFF"
+        ' 
+        ' DEBUGONToolStripMenuItem
+        ' 
+        DEBUGONToolStripMenuItem.Name = "DEBUGONToolStripMenuItem"
+        DEBUGONToolStripMenuItem.Size = New Size(154, 22)
+        DEBUGONToolStripMenuItem.Text = "DEBUG ON"
+        ' 
+        ' DEBUGOFFToolStripMenuItem
+        ' 
+        DEBUGOFFToolStripMenuItem.Name = "DEBUGOFFToolStripMenuItem"
+        DEBUGOFFToolStripMenuItem.Size = New Size(154, 22)
+        DEBUGOFFToolStripMenuItem.Text = "DEBUG OFF"
+        ' 
+        ' TestToolStripMenuItem
+        ' 
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem})
+        TestToolStripMenuItem.Name = "TestToolStripMenuItem"
+        TestToolStripMenuItem.Size = New Size(40, 20)
+        TestToolStripMenuItem.Text = "Test"
+        ' 
+        ' WordAccessToolStripMenuItem
+        ' 
+        WordAccessToolStripMenuItem.Name = "WordAccessToolStripMenuItem"
+        WordAccessToolStripMenuItem.Size = New Size(244, 22)
+        WordAccessToolStripMenuItem.Text = "Word access"
+        ' 
+        ' TestIEEEToLeetroFpConversionToolStripMenuItem
+        ' 
+        TestIEEEToLeetroFpConversionToolStripMenuItem.Name = "TestIEEEToLeetroFpConversionToolStripMenuItem"
+        TestIEEEToLeetroFpConversionToolStripMenuItem.Size = New Size(244, 22)
+        TestIEEEToLeetroFpConversionToolStripMenuItem.Text = "Test IEEE to Leetro fp conversion"
+        ' 
+        ' TextTestToolStripMenuItem
+        ' 
+        TextTestToolStripMenuItem.Name = "TextTestToolStripMenuItem"
+        TextTestToolStripMenuItem.Size = New Size(244, 22)
+        TextTestToolStripMenuItem.Text = "Text test"
         ' 
         ' TextBox1
         ' 
-        TextBox1.Location = New Point(10, 31)
+        TextBox1.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        TextBox1.Location = New Point(12, 31)
         TextBox1.Multiline = True
         TextBox1.Name = "TextBox1"
         TextBox1.ScrollBars = ScrollBars.Both
-        TextBox1.Size = New Size(1025, 565)
+        TextBox1.Size = New Size(1023, 554)
         TextBox1.TabIndex = 1
+        ' 
+        ' ProgressBar1
+        ' 
+        ProgressBar1.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        ProgressBar1.Location = New Point(12, 591)
+        ProgressBar1.Name = "ProgressBar1"
+        ProgressBar1.Size = New Size(1023, 21)
+        ProgressBar1.TabIndex = 2
         ' 
         ' Form1
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(1047, 608)
+        ClientSize = New Size(1047, 618)
+        Controls.Add(ProgressBar1)
         Controls.Add(TextBox1)
         Controls.Add(MenuStrip1)
         MainMenuStrip = MenuStrip1
+        MinimizeBox = False
         Name = "Form1"
         Text = "MOL"
         MenuStrip1.ResumeLayout(False)
@@ -88,5 +186,18 @@ Partial Class Form1
     Friend WithEvents OpenToolStripMenuItem1 As ToolStripMenuItem
     Friend WithEvents ExitToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents TextBox1 As TextBox
+    Friend WithEvents TestToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents WordAccessToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DebugToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents HEXDUMPONToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents HEXDUMPOFFToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DEBUGONToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DEBUGOFFToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents MakeTestCardToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents TestIEEEToLeetroFpConversionToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ProgressBar1 As ProgressBar
+    Friend WithEvents TestCardParametersToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents TextTestToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DXFMetricsToolStripMenuItem As ToolStripMenuItem
 
 End Class
