@@ -28,6 +28,7 @@ Partial Class Form1
         TestCardParametersToolStripMenuItem = New ToolStripMenuItem()
         MakeTestCardToolStripMenuItem = New ToolStripMenuItem()
         DXFMetricsToolStripMenuItem = New ToolStripMenuItem()
+        ReconstructMINIMARIOMOLToolStripMenuItem = New ToolStripMenuItem()
         ExitToolStripMenuItem = New ToolStripMenuItem()
         DebugToolStripMenuItem = New ToolStripMenuItem()
         HEXDUMPONToolStripMenuItem = New ToolStripMenuItem()
@@ -40,6 +41,7 @@ Partial Class Form1
         TextTestToolStripMenuItem = New ToolStripMenuItem()
         TextBox1 = New TextBox()
         ProgressBar1 = New ProgressBar()
+        CommandSummaryToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
@@ -54,7 +56,7 @@ Partial Class Form1
         ' 
         ' OpenToolStripMenuItem
         ' 
-        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {OpenToolStripMenuItem1, TestCardParametersToolStripMenuItem, MakeTestCardToolStripMenuItem, DXFMetricsToolStripMenuItem, ExitToolStripMenuItem})
+        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {OpenToolStripMenuItem1, TestCardParametersToolStripMenuItem, MakeTestCardToolStripMenuItem, DXFMetricsToolStripMenuItem, ReconstructMINIMARIOMOLToolStripMenuItem, CommandSummaryToolStripMenuItem, ExitToolStripMenuItem})
         OpenToolStripMenuItem.Name = "OpenToolStripMenuItem"
         OpenToolStripMenuItem.Size = New Size(37, 20)
         OpenToolStripMenuItem.Text = "File"
@@ -62,31 +64,37 @@ Partial Class Form1
         ' OpenToolStripMenuItem1
         ' 
         OpenToolStripMenuItem1.Name = "OpenToolStripMenuItem1"
-        OpenToolStripMenuItem1.Size = New Size(183, 22)
+        OpenToolStripMenuItem1.Size = New Size(233, 22)
         OpenToolStripMenuItem1.Text = "Open"
         ' 
         ' TestCardParametersToolStripMenuItem
         ' 
         TestCardParametersToolStripMenuItem.Name = "TestCardParametersToolStripMenuItem"
-        TestCardParametersToolStripMenuItem.Size = New Size(183, 22)
+        TestCardParametersToolStripMenuItem.Size = New Size(233, 22)
         TestCardParametersToolStripMenuItem.Text = "Test card parameters"
         ' 
         ' MakeTestCardToolStripMenuItem
         ' 
         MakeTestCardToolStripMenuItem.Name = "MakeTestCardToolStripMenuItem"
-        MakeTestCardToolStripMenuItem.Size = New Size(183, 22)
+        MakeTestCardToolStripMenuItem.Size = New Size(233, 22)
         MakeTestCardToolStripMenuItem.Text = "Make Test card"
         ' 
         ' DXFMetricsToolStripMenuItem
         ' 
         DXFMetricsToolStripMenuItem.Name = "DXFMetricsToolStripMenuItem"
-        DXFMetricsToolStripMenuItem.Size = New Size(183, 22)
+        DXFMetricsToolStripMenuItem.Size = New Size(233, 22)
         DXFMetricsToolStripMenuItem.Text = "DXF metrics"
+        ' 
+        ' ReconstructMINIMARIOMOLToolStripMenuItem
+        ' 
+        ReconstructMINIMARIOMOLToolStripMenuItem.Name = "ReconstructMINIMARIOMOLToolStripMenuItem"
+        ReconstructMINIMARIOMOLToolStripMenuItem.Size = New Size(233, 22)
+        ReconstructMINIMARIOMOLToolStripMenuItem.Text = "Reconstruct MINIMARIO.MOL"
         ' 
         ' ExitToolStripMenuItem
         ' 
         ExitToolStripMenuItem.Name = "ExitToolStripMenuItem"
-        ExitToolStripMenuItem.Size = New Size(183, 22)
+        ExitToolStripMenuItem.Size = New Size(233, 22)
         ExitToolStripMenuItem.Text = "Exit"
         ' 
         ' DebugToolStripMenuItem
@@ -163,6 +171,12 @@ Partial Class Form1
         ProgressBar1.Size = New Size(1023, 21)
         ProgressBar1.TabIndex = 2
         ' 
+        ' CommandSummaryToolStripMenuItem
+        ' 
+        CommandSummaryToolStripMenuItem.Name = "CommandSummaryToolStripMenuItem"
+        CommandSummaryToolStripMenuItem.Size = New Size(233, 22)
+        CommandSummaryToolStripMenuItem.Text = "Command summary"
+        ' 
         ' Form1
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
@@ -199,5 +213,7 @@ Partial Class Form1
     Friend WithEvents TestCardParametersToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents TextTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents DXFMetricsToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ReconstructMINIMARIOMOLToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents CommandSummaryToolStripMenuItem As ToolStripMenuItem
 
 End Class

@@ -8,6 +8,7 @@ Imports System.Windows.Media
 Imports System.Windows
 Imports System.Globalization
 Imports System.Windows.Shapes
+Imports System.Collections.Immutable
 
 ' Define the different block types
 Enum BLOCK_TYPE
@@ -22,6 +23,10 @@ End Enum
 Enum OnOff_type
     Off = 0
     _On = 1
+End Enum
+Enum Acceleration_type
+    Accelerate = 1
+    Decelerate = 2
 End Enum
 Public Class Form1
     Const BLOCK_SIZE = 512
@@ -89,10 +94,10 @@ Public Class Form1
     Class parameter
         ' a class for a parameter
         Property name As String     ' the name of the parameter
-        Property type As Type       ' the type of the parameter
+        Property typ As Type       ' the type of the parameter
         Sub New(name As String, type As Type)
             Me.name = name
-            Me.type = type
+            Me.typ = type
         End Sub
 
     End Class
@@ -111,7 +116,7 @@ Public Class Form1
     Const MOL_MOVEREL = &H3026000
     Const MOL_START = &H3026040
     Const MOL_ORIGIN = &H346040
-    Const MOL_MOTION_COMMAND_COUNT = &H3090080
+    Const MOTION_CMD_COUNT = &H3090080
     Const MOL_BEGSUB = &H1300008
     Const MOL_BEGSUBa = &H1300048
     Const MOL_ENDSUB = &H1400048
@@ -120,16 +125,19 @@ Public Class Form1
     Const MOL_MOTION = &H3000341
     Const MOL_LASER = &H1000606
     Const MOL_GOSUB = &H1500048
-    Const MOL_BLOWER = &H1004601
-    Const MOL_BLOWERa = &H1004A41
-    Const MOL_BLOWERb = &H1004B41
+    Const MOL_ACCELERATION = &H1004601
+    Const MOL_BLOWER = &H1004A41
+    Const MOL_BLOWERa = &H1004B41
     Const MOL_SEGMENT = &H500008
     Const MOL_ENGMVX = &H210040
     Const MOL_ENGMVY = &H214040
+    Const MOL_SCALE = &H3000E46
+    Const MOL_PWRSPD5 = &H5000E46
+    Const MOL_PWRSPD7 = &H7000E46
     Const MOL_END = 0
 
     ' Dictionary of all commands
-    Dim LASERcmds As New Dictionary(Of Integer, LASERcmd) From {
+    Private LASERcmds As New SortedDictionary(Of Integer, LASERcmd) From {
         {MOL_MOVEREL, New LASERcmd("MOVEREL", New List(Of parameter) From {
                             {New parameter("n", GetType(Int32))},
                             {New parameter("dx", GetType(Int32))},
@@ -142,13 +150,37 @@ Public Class Form1
                             {New parameter("y", GetType(Int32))}
                             }
                            )},
+        {MOL_SCALE, New LASERcmd("SCALE", New List(Of parameter) From {
+                            {New parameter("x scale", GetType(Single))},
+                            {New parameter("y scale", GetType(Single))},
+                            {New parameter("z scale", GetType(Single))}
+                            }
+                           )},
+        {MOL_PWRSPD5, New LASERcmd("PWRSPD5", New List(Of parameter) From {
+                            {New parameter("Corner Power %", GetType(Int32))},
+                            {New parameter("Max Power %", GetType(Int32))},
+                            {New parameter("Start cutter speed/speedmult", GetType(Single))},
+                            {New parameter("Start cutter speed/speedmult", GetType(Single))},
+                            {New parameter("Start cutter speed/speedmult", GetType(Single))}
+                            }
+                           )},
+        {MOL_PWRSPD7, New LASERcmd("PWRSPD7", New List(Of parameter) From {
+                            {New parameter("Corner Power %", GetType(Int32))},
+                            {New parameter("Max Power %", GetType(Int32))},
+                            {New parameter("Start cutter speed/speedmult", GetType(Single))},
+                            {New parameter("Start cutter speed/speedmult", GetType(Single))},
+                            {New parameter("Start cutter speed/speedmult", GetType(Single))},
+                            {New parameter("Laser2 Corner Power", GetType(Int32))},
+                            {New parameter("Laser2 Max Power", GetType(Int32))}
+                            }
+                           )},
         {MOL_ORIGIN, New LASERcmd("ORIGIN", New List(Of parameter) From {
                             {New parameter("n", GetType(Int32))},
                             {New parameter("x", GetType(Int32))},
                             {New parameter("y", GetType(Int32))}
                             }
                            )},
-        {MOL_MOTION_COMMAND_COUNT, New LASERcmd("MOTION_COMMAND_COUNT", New List(Of parameter) From {{New parameter("count", GetType(Int32))}})},
+        {MOTION_CMD_COUNT, New LASERcmd("MOTION_COMMAND_COUNT", New List(Of parameter) From {{New parameter("count", GetType(Int32))}})},
         {MOL_BEGSUB, New LASERcmd("BEGSUB", New List(Of parameter) From {{New parameter("n", GetType(Int32))}})},
         {MOL_BEGSUBa, New LASERcmd("BEGSUBa", New List(Of parameter) From {{New parameter("n", GetType(Int32))}})},
         {MOL_ENDSUB, New LASERcmd("ENDSUB", New List(Of parameter) From {{New parameter("n", GetType(Int32))}})},
@@ -178,9 +210,9 @@ Public Class Form1
                             {New parameter("y", GetType(Single))}
                             }
                            )},
+        {MOL_ACCELERATION, New LASERcmd("ACCELERATION", New List(Of parameter) From {{New parameter("Acceleration", GetType(Acceleration_type))}})},
         {MOL_BLOWER, New LASERcmd("BLOWER", New List(Of parameter) From {{New parameter("On/Off", GetType(OnOff_type))}})},
         {MOL_BLOWERa, New LASERcmd("BLOWERa", New List(Of parameter) From {{New parameter("On/Off", GetType(OnOff_type))}})},
-        {MOL_BLOWERb, New LASERcmd("BLOWERb", New List(Of parameter) From {{New parameter("On/Off", GetType(OnOff_type))}})},
         {MOL_ENGMVX, New LASERcmd("ENGMVX", New List(Of parameter) From {{New parameter("Axis", GetType(Integer))}, {New parameter("n", GetType(Integer))}})},
         {MOL_ENGMVY, New LASERcmd("ENGMVX", New List(Of parameter) From {{New parameter("x", GetType(Integer))}, {New parameter("OnOff", GetType(Boolean))}})},
         {MOL_END, New LASERcmd("END")}
@@ -293,13 +325,6 @@ Public Class Form1
         writer.Write(n)
     End Sub
 
-    ' Create a union so that a float can be accessed as a UInt
-    <StructLayout(LayoutKind.Explicit)> Public Structure IntFloatUnion
-        <FieldOffset(0)>
-        Public i As UInteger
-        <FieldOffset(0)> Dim f As Single
-    End Structure
-
     Sub DisplayHeader()
         ' Display header info
         Dim chunk As Integer
@@ -322,21 +347,6 @@ Public Class Form1
         TextBox1.AppendText($"Origin: {TopRight.X},{TopRight.Y}{vbCrLf}")
         BottomLeft = New System.Drawing.Point(GetInt(&H20), GetInt())
         TextBox1.AppendText($"Bottom Left: ({BottomLeft.X},{BottomLeft.Y}){vbCrLf}")
-        ' Scale factors
-        Dim n = GetInt(&H24C)   ' ??
-        xScale = GetFloat()     ' X scale
-        yscale = GetFloat()     ' Y scale
-        TextBox1.AppendText($"X scale: {xScale}, Y scale {yscale}{vbCrLf}")
-        ' Speed/accel
-        Dim arg1 = GetFloat(&H274)
-        Dim arg2 = GetFloat()
-        Dim arg3 = GetFloat()
-        TextBox1.AppendText($"Initial speed: {arg1}, Max speed {arg2}, Accel {arg3}{vbCrLf}")
-        'Object size
-        n = GetInt(&H284)
-        Dim x = GetInt() / xScale
-        Dim y = GetInt() / yscale
-        TextBox1.AppendText($"Object size {x}mm x {y}mm{vbCrLf}")
 
         ConfigChunk = GetInt(&H70)
         TestChunk = GetInt(&H74)
@@ -441,9 +451,9 @@ Public Class Form1
             End If
             If debugflag Then TextBox1.AppendText($" CMD &h{cmd:x8} ")
             Select Case command
-                Case &H0        ' END
+                Case MOL_END And &HFFFFFF
+                    decodeCmd(cmd_posn)
                     done = True
-                    If debugflag Then TextBox1.AppendText("END")
                     If motion.Vertexes.Count > 0 Then
                         ' add the motion to the dxf file    
                         dxf.Entities.Add(motion)
@@ -476,15 +486,12 @@ Public Class Form1
                     With ProgressBar1
                         If .Value < .Maximum Then .Value += 1
                     End With
-                Case &H4601, &HB06  ' Blower
+                Case MOL_BLOWER And &HFFFFFF ' Blower
                     decodeCmd(cmd_posn)
-                Case &HE46
-                    Dim params As New List(Of Integer)
-                    ' Collect parameters. Could be 3, 5 or 7
-                    For i = 1 To nWords
-                        params.Add(GetFloat)
-                    Next
-                    If debugflag Then TextBox1.AppendText($"Laser parameters: {String.Join(",", params)}")
+                Case MOL_SCALE And &HFFFFFF     ' also MOL_SPDPWR, MOL_SPDPWRx
+                    decodeCmd(cmd_posn)
+                    reader.BaseStream.Seek(param_posn, SeekOrigin.Begin)    ' backup to read the parameters again
+                    xScale = GetFloat() : yScale = GetFloat() : GetFloat()        ' x,y,z scale command
                 Case MOL_MOVEREL And &HFFFFFF
                     decodeCmd(cmd_posn)
                     reader.BaseStream.Seek(param_posn, SeekOrigin.Begin)    ' backup to read the parameters again
@@ -504,35 +511,15 @@ Public Class Form1
                     If motion.Vertexes.Count = 0 Then motion.Vertexes.Add(New Polyline2DVertex(position))   ' first move - add start point
                     Dim posn = New Vector2(GetInt(), GetInt())      ' move relative command
                     startposn = posn       ' remember start position for this block
-                Case &H4601       ' Accelerate/Decelerate
-                    Dim acc = GetInt()
-                    Select Case acc
-                        Case &H1 : If debugflag Then TextBox1.AppendText($"Accelerate")
-                        Case &H2 : If debugflag Then TextBox1.AppendText($"Decelerate")
-                        Case Else
-                            If debugflag Then TextBox1.AppendText($"Unknown acceleration parameter &h{acc:x8}")
-                    End Select
+                Case MOL_ACCELERATION       ' Accelerate/Decelerate
+                    decodeCmd(cmd_posn)
                 Case MOL_ENGMVX And &HFFFFFF    ' Engrave move X (laser off)
                     decodeCmd(cmd_posn)
-                    Dim axis = GetInt()
-                    Dim AxisStr As String
-                    Select Case axis
-                        Case 3
-                            AxisStr = "Y"
-                        Case 4
-                            AxisStr = "X"
-                        Case Else
-                            AxisStr = "Unknown"
-                    End Select
-                    Dim n = GetInt()
-                    If debugflag Then TextBox1.AppendText($"Engrave move axis={AxisStr},n={n}")
                 Case MOL_ENGMVY And &HFFFFFF  ' Engrave move Y (laser on/off)
-                    Dim x = GetInt()
-                    Dim OnOff = GetInt()
-                    If debugflag Then TextBox1.AppendText($"Engrave move x={x}, laser={OnOff}")
+                    decodeCmd(cmd_posn)
                 Case MOL_ORIGIN And &HFFFFFF    ' origin
                     decodeCmd(cmd_posn)
-                Case MOL_MOTION_COMMAND_COUNT
+                Case MOTION_CMD_COUNT
                     decodeCmd(cmd_posn)
                 Case MOL_BEGSUB And &HFFFFFF, MOL_BEGSUBa And &HFFFFFF ' begin subroutine
                     decodeCmd(cmd_posn)
@@ -551,11 +538,11 @@ Public Class Form1
                     ' Create layer for draw
                     If CanChangeLayer Then
                         layer = New Layer($"Draw {n}") With
-                    {
-                        .Color = colors(ColorIndex),
-                        .Linetype = Linetype.Continuous,
-                        .Lineweight = Lineweight.W100
-                    }
+            {
+                .Color = colors(ColorIndex),
+                .Linetype = Linetype.Continuous,
+                .Lineweight = Lineweight.W100
+            }
                         ColorIndex += 20
                     End If
                 Case MOL_ENDSUB And &HFFFFFF ' end subroutine
@@ -616,13 +603,14 @@ Public Class Form1
             TextBox1.AppendText($" {value.mnemonic}")
             For Each p In value.parameters
                 TextBox1.AppendText($" {p.name}=")
-                Select Case p.type
+                Select Case p.typ
                     Case GetType(Boolean) : TextBox1.AppendText(CType(GetInt(), Boolean))
                     Case GetType(Int32) : TextBox1.AppendText(CType(GetInt(), Int32))
                     Case GetType(Single) : TextBox1.AppendText(CType(GetFloat(), Single))
-                    Case GetType(OnOff_type) : If GetInt() Mod 2 = 0 Then TextBox1.AppendText("Off") Else TextBox1.AppendText("On")
+                    Case GetType(OnOff_type) : Dim par = GetInt() : If par Mod 2 = 0 Then TextBox1.AppendText($"Off({par:x})") Else TextBox1.AppendText($"On({par:x})")
+                    Case GetType(Acceleration_type) : TextBox1.AppendText($"{CType(GetInt(), Acceleration_type)}")
                     Case Else
-                        MsgBox($"{value.mnemonic}: Unrecognised parameter type of {p.type}", vbCritical + vbOKOnly, "data error")
+                        MsgBox($"{value.mnemonic}: Unrecognised parameter type of {p.typ}", vbCritical + vbOKOnly, "data error")
                 End Select
             Next
         Else
@@ -747,7 +735,7 @@ Public Class Form1
         ' Bottom left
         writer.Seek(&H20, SeekOrigin.Begin)
         writer.Write(CInt(Outline.X * xScale))
-        writer.Write(CInt(Outline.Y * yscale))
+        writer.Write(CInt(Outline.Y * yScale))
 
         'TEST
         Dim position = New Vector2(0, 0)    ' TEST block start
@@ -804,7 +792,7 @@ Public Class Form1
     Sub MOVERELCMD(writer As BinaryWriter, p As Vector2, speed As Single)
         ' send a MOVEREL command to MOL file
         PutInt(MOL_SETSPD) : PutFloat(speed) : PutInt(64032) : PutInt(64032)
-        PutInt(MOL_MOVEREL) : PutInt(772) : PutInt(CInt(p.X * xScale)) : PutInt(CInt(p.Y * yscale))
+        PutInt(MOL_MOVEREL) : PutInt(772) : PutInt(CInt(p.X * xScale)) : PutInt(CInt(p.Y * yScale))
         position += p
     End Sub
     Sub DrawBox(dxf As DxfDocument, origin As System.Windows.Point, width As Single, height As Single, shaded As Boolean, power As Integer, speed As Integer)
@@ -820,7 +808,7 @@ Public Class Form1
         TextBox1.AppendText($"Drawing box at ({origin.X},{origin.Y}) width {width} height {height} power {power} speed {speed}{vbCrLf}")
         My.Application.DoEvents()
         Dim rect As New System.Windows.Rect(0, 0, width, height)
-        Dim mat As New Matrix(xScale, 0, 0, yscale, origin.X * xScale, origin.Y * yscale)
+        Dim mat As New Matrix(xScale, 0, 0, yScale, origin.X * xScale, origin.Y * yScale)
         rect.Transform(mat)
         ' create an hls color to represent power and speed as a shade of brown (=30 degrees)
         Dim shading As AciColor = PowerSpeedColor(power, speed)
@@ -838,7 +826,7 @@ Public Class Form1
             dxf.Entities.Add(motion)
         Else
             Dim position = New System.Windows.Point(rect.Left, rect.Top)     ' note Top <--> Bottom
-            Dim RasterHeight = My.Settings.Interval * yscale   ' separation of raster lines
+            Dim RasterHeight = My.Settings.Interval * yScale   ' separation of raster lines
             Dim RasterWidth = rect.Width                     ' width of raster lines
             Dim line As Integer
             motion = New Polyline2D
@@ -895,8 +883,8 @@ Public Class Form1
             .Children.Add(New RotateTransform(angle))                    ' rotate  
             Dim TextScale = 0.352778    ' conversion of points to mm
             .Children.Add(New ScaleTransform(TextScale, TextScale))       ' scale points to mm
-            .Children.Add(New ScaleTransform(xScale, yscale))       ' scale mm to steps
-            .Children.Add(New TranslateTransform(origin.X * xScale, origin.Y * yscale))    ' move geometry to origin
+            .Children.Add(New ScaleTransform(xScale, yScale))       ' scale mm to steps
+            .Children.Add(New TranslateTransform(origin.X * xScale, origin.Y * yScale))    ' move geometry to origin
         End With
         _textGeometry.Transform = transforms
 
@@ -1028,29 +1016,102 @@ Public Class Form1
             Next
         End With
     End Sub
+
+    Private Sub ReconstructMINIMARIOMOLToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ReconstructMINIMARIOMOLToolStripMenuItem.Click
+        ' Reconstruct the MINIMARIO.MOL file from the hex dump on the London Hackspace page
+        ' Retrieved from https://wiki.london.hackspace.org.uk/view/Project:RELaserSoftware/MOL_file_format
+
+        Dim bytes(&H1000 - 1) As Byte
+        Using reader As New Microsoft.VisualBasic.FileIO.TextFieldParser("minimario.txt")
+            reader.SetDelimiters(" ")
+            Dim currentRow As String()
+            While Not reader.EndOfData
+                Try
+                    currentRow = reader.ReadFields()
+                    If currentRow.Length = 17 Then
+                        ' extract the address
+                        Dim addr As Integer
+                        If Integer.TryParse(currentRow(0), Globalization.NumberStyles.HexNumber, Globalization.CultureInfo.InvariantCulture, addr) Then
+                        Else
+                            Throw New ArgumentException("Argument is invalid")
+                        End If
+                        ' extract row of bytes
+                        For i = 1 To 16
+                            Dim data As Byte
+                            If Byte.TryParse(currentRow(i), Globalization.NumberStyles.HexNumber, Globalization.CultureInfo.InvariantCulture, data) Then
+                                bytes(addr + i - 1) = data
+                            Else
+                                Throw New ArgumentException("Argument is invalid")
+                            End If
+                        Next
+                    End If
+                Catch ex As Microsoft.VisualBasic.FileIO.MalformedLineException
+                    MsgBox("Line " & ex.Message & "is not valid and will be skipped.")
+                End Try
+            End While
+        End Using
+        ' now dump to binary file
+        My.Computer.FileSystem.WriteAllBytes("minimario.MOL", bytes, False)
+    End Sub
+
+    Private Sub CommandSummaryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CommandSummaryToolStripMenuItem.Click
+        ' produce a summary of all command
+        TextBox1.AppendText($"Command summary{vbCrLf}{vbCrLf}")
+        TextBox1.AppendText($"{"HEX value",-12}{"Mnemonic",-15}  Parameters (name is type){vbCrLf}")
+        For Each cmd In LASERcmds
+            TextBox1.AppendText($"0x{cmd.Key:x8}  {cmd.Value.mnemonic,-15}  ")
+            'now parameters
+            Dim parameters = New List(Of String)
+            For Each p In cmd.Value.parameters
+                parameters.Add($"{p.name} is {p.typ.Name}")
+            Next
+            TextBox1.AppendText(String.Join(", ", parameters.ToArray))
+            TextBox1.AppendText($"{vbCrLf}")
+        Next
+        ' Custom types. Display details of any parameters that are defined using ENUM. These are used when a basetype won't do
+        Dim CustomTypes As New List(Of Type)
+        For Each cmd In LASERcmds       ' search all commands
+            For Each p In cmd.Value.parameters  ' searcg all parameters
+                If p.typ.BaseType.Name = "Enum" Then    ' Add any non standand types to list
+                    If Not CustomTypes.Contains(p.typ) Then CustomTypes.Add(p.typ)
+                End If
+            Next
+        Next
+        ' Display list of custom types
+        TextBox1.AppendText($"{vbCrLf}Custom types{vbCrLf}")
+        For Each ct In CustomTypes
+            Dim enums As New List(Of String)
+            For Each value In System.Enum.GetValues(ct)     ' extract name and value of type
+                Dim name = value.ToString
+                Dim valu = CInt(value).ToString
+                enums.Add($"{name}={valu}")
+            Next
+            TextBox1.AppendText($"{ct.Name,-25} {String.Join(",", enums)}{vbCrLf}")
+        Next
+    End Sub
 End Class
 Class EngraveLine
-        ' Captures the data for a single line of an engraving
-        Property Start As Vector2   ' the start position of this line of engraving
-        Property Segments As New List(Of EngraveSegment)    ' list of segments of the engrave
+    ' Captures the data for a single line of an engraving
+    Property Start As Vector2   ' the start position of this line of engraving
+    Property Segments As New List(Of EngraveSegment)    ' list of segments of the engrave
 
-        Public Sub New(start As Vector2)
-            Me.Start = start
-            Me.Segments = New List(Of EngraveSegment)
-        End Sub
-    End Class
-    Class EngraveSegment
-        ' Captures the data for a segment of an engraving line. An EngraveLine is a contiguous list of EngraveSegments
-        ' Segments are horizontal, so only X changes.
-        Property Length As Integer       ' length of this segment (steps). Can be +ve or -ve
-        Property Speed As Single        ' speed of laser movement (mm/sec)
-        Property Power As Single        ' power of laser ( 0 - 100%)
-        Property Laser As Boolean       ' laser On or Off
-        ReadOnly Property Color As AciColor     ' the color to use to represent this speed/power
-            Get
-                Return PowerSpeedColor(Me.Power, Me.Speed)
-            End Get
-        End Property
+    Public Sub New(start As Vector2)
+        Me.Start = start
+        Me.Segments = New List(Of EngraveSegment)
+    End Sub
+End Class
+Class EngraveSegment
+    ' Captures the data for a segment of an engraving line. An EngraveLine is a contiguous list of EngraveSegments
+    ' Segments are horizontal, so only X changes.
+    Property Length As Integer       ' length of this segment (steps). Can be +ve or -ve
+    Property Speed As Single        ' speed of laser movement (mm/sec)
+    Property Power As Single        ' power of laser ( 0 - 100%)
+    Property Laser As Boolean       ' laser On or Off
+    ReadOnly Property Color As AciColor     ' the color to use to represent this speed/power
+        Get
+            Return PowerSpeedColor(Me.Power, Me.Speed)
+        End Get
+    End Property
 
     Public Sub New(speed As Single, power As Single, laser As Boolean, length As Single)
         Me.Speed = speed

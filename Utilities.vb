@@ -1,8 +1,15 @@
-﻿Imports MOL.Form1
+﻿Imports System.Runtime.InteropServices
+Imports MOL.Form1
 Imports netDxf
 
 ' Miscellaneous SHARED routines that don't belong in a class
 Module Utilities
+    ' Create a union so that a float can be accessed as a UInt
+    <StructLayout(LayoutKind.Explicit)> Public Structure IntFloatUnion
+        <FieldOffset(0)>
+        Public i As UInteger
+        <FieldOffset(0)> Dim f As Single
+    End Structure
     Function Leetro2Float(b As UInteger) As Single
         ' Converts a custom Leetro floating-point format to an IEEE 754 floating-point number.
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
