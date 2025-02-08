@@ -1,0 +1,482 @@
+HEADER &0
+Size of file: &h2200
+Motion blocks: 388
+Version: 4.1.2.2
+Origin: 0,0
+Bottom Left: (-8818,-7316)
+Config chunk: 1
+Test chunk: 2
+Cut chunk: 3
+Draw chunks: 5
+
+
+Decode of commands at 0x200 in block CONFIG
+
+200:  X5_FIRST
+204: Unknown: 80600148 Params 2:  00000004 02000000
+214: Unknown: 80600148 Params 2:  00000003 01400000
+224: Unknown: 00200848 Params 0: 
+228: Unknown: 00200748 Params 0: 
+22c: Unknown: 80600148 Params 6:  0000025b 091d4000 0f13a300 1113a340 101d7a80 0f716c00
+24c:  SCALE x scale=125.98047 y scale=125.98047 z scale=313.71875
+25c: Unknown: 01200948 Params 1:  00000000
+264: Unknown: 03046040 Params 3:  00000304 00013af5 0000f16c
+274:  MOTION a=152911872 b=252945152 c=286499648
+284:  START n=772 x=-10582 y=-7285
+294:  GOSUBn n=3 x=1 y=1
+2a8: Unknown: 01000846 Params 1:  00000000
+2b0:  GOSUBn n=603 x=1.2501831 y=0
+2c4: END
+
+Decode of commands at 0x400 in block TEST
+
+400:  BEGSUBa n=1
+408: Unknown: 80600148 Params 6:  0000025b 091d4000 0f13a300 1113a340 101d7a80 0f716c00
+428:  MCB Size=80
+430:  ACCELERATION Acceleration=Accelerate
+438:  SETSPD a=629 b=36518 c=151176
+448:  MOVEREL n=772 dx=-4409 dy=0
+458:  ACCELERATION Acceleration=Decelerate
+460:  SETSPD a=890.8125 b=36518 c=151176
+470:  MOVEREL n=772 dx=-4409 dy=0
+480:  ACCELERATION Acceleration=Accelerate
+488:  SETSPD a=890.8125 b=33268 c=151176
+498:  MOVEREL n=772 dx=0 dy=-3657
+4a8:  ACCELERATION Acceleration=Decelerate
+4b0:  SETSPD a=890.8125 b=33268 c=151176
+4c0:  MOVEREL n=772 dx=0 dy=-3659
+4d0:  ACCELERATION Acceleration=Accelerate
+4d8:  SETSPD a=890.8125 b=36522 c=151176
+4e8:  MOVEREL n=772 dx=4408 dy=0
+4f8:  ACCELERATION Acceleration=Decelerate
+500:  SETSPD a=890.8125 b=36522 c=151176
+510:  MOVEREL n=772 dx=4410 dy=0
+520:  ACCELERATION Acceleration=Accelerate
+528:  SETSPD a=890.8125 b=33266 c=151176
+538:  MOVEREL n=772 dx=0 dy=3657
+548:  ACCELERATION Acceleration=Decelerate
+550:  SETSPD a=629 b=33266 c=151176
+560:  MOVEREL n=772 dx=0 dy=3659
+570:  ENDSUB n=1
+578: END
+
+Decode of commands at 0x600 in block CUT
+
+600:  BEGSUBa n=2
+608: Unknown: 80600148 Params 6:  0000025b 091d4000 0f13a300 1113a340 101d7a80 0f716c00
+628:  PWRSPD5 Corner PWR % x100=4000 Max PWR % x100=4000 Start cutter speed/speedmult=629 Start cutter speed/speedmult=3149 Start cutter speed/speedmult=0
+640:  PWRSPD7 Corner PWR % x100=4000 Max PWR % x100=4000 Start cutter speed/speedmult=1.0004272 Start cutter speed/speedmult=1.0004272 Start cutter speed/speedmult=629 Laser2 Corner Power=189059072 Laser2 Max Power=0
+660:  MCB Size=136
+668:  ACCELERATION Acceleration=Accelerate
+670:  SETSPD a=629 b=7366.25 c=151176
+680:  MOVEREL n=772 dx=125 dy=125
+690:  ACCELERATION Acceleration=Decelerate
+698:  SETSPD a=613.59375 b=7366.25 c=151176
+6a8:  MOVEREL n=772 dx=127 dy=127
+6b8:  LASER On/Off=On(1)
+6c0:  ACCELERATION Acceleration=Accelerate
+6c8:  SETSPD a=613.59375 b=3149 c=62992
+6d8:  MOVEREL n=772 dx=-75 dy=0
+6e8:  SETSPD a=3149 b=3149 c=62992
+6f8:  MOVEREL n=772 dx=-9175 dy=0
+708:  ACCELERATION Acceleration=Decelerate
+710:  SETSPD a=890.8125 b=3149 c=62992
+720:  MOVEREL n=772 dx=-72 dy=0
+730:  ACCELERATION Acceleration=Accelerate
+738:  SETSPD a=890.8125 b=3149 c=62992
+748:  MOVEREL n=772 dx=0 dy=-72
+758:  SETSPD a=3149 b=3149 c=62992
+768:  MOVEREL n=772 dx=0 dy=-7676
+778:  ACCELERATION Acceleration=Decelerate
+780:  SETSPD a=890.8125 b=3149 c=62992
+790:  MOVEREL n=772 dx=0 dy=-72
+7a0:  ACCELERATION Acceleration=Accelerate
+7a8:  SETSPD a=890.8125 b=3149 c=62992
+7b8:  MOVEREL n=772 dx=72 dy=0
+7c8:  SETSPD a=3149 b=3149 c=62992
+7d8:  MOVEREL n=772 dx=9178 dy=0
+7e8:  ACCELERATION Acceleration=Decelerate
+7f0:  SETSPD a=890.8125 b=3149 c=62992
+800:  MOVEREL n=772 dx=72 dy=0
+810:  ACCELERATION Acceleration=Accelerate
+818:  SETSPD a=890.8125 b=3149 c=62992
+828:  MOVEREL n=772 dx=0 dy=72
+838:  SETSPD a=3149 b=3149 c=62992
+848:  MOVEREL n=772 dx=0 dy=7673
+858:  ACCELERATION Acceleration=Decelerate
+860:  SETSPD a=629 b=3149 c=62992
+870:  MOVEREL n=772 dx=0 dy=75
+880:  LASER On/Off=Off(0)
+888:  ENDSUB n=2
+890: END
+
+Decode of commands at 0xa00 in block DRAW
+
+a00:  BEGSUBa n=3
+a08: Unknown: 01000d46 Params 1:  00000bb8
+a10: Unknown: 01000646 Params 1:  00000002
+a18:  ENGACD x=1763
+a20: Unknown: 01000246 Params 1:  00000000
+a28: Unknown: 02014341 Params 2:  00000004 0e13a200
+a34: Unknown: 04010141 Params 4:  00000004 0c6c3800 0e13a200 13574e10
+a48: Unknown: 02010041 Params 2:  00000003 0b6c3000
+a54:  PWRSPD5 Corner PWR % x100=0 Max PWR % x100=10 Start cutter speed/speedmult=1 Start cutter speed/speedmult=10000 Start cutter speed/speedmult=1
+a6c: Unknown: 01000746 Params 1:  000003e8
+a74:  PWRSPD7 Corner PWR % x100=0 Max PWR % x100=10 Start cutter speed/speedmult=0 Start cutter speed/speedmult=1 Start cutter speed/speedmult=1 Laser2 Corner Power=219955200 Laser2 Max Power=1
+a94: Unknown: 02000746 Params 2:  000003e8 00001770
+aa0: Unknown: 01000b46 Params 1:  00000201
+aa8:  ENGLSR List of steps=List of 4 On/Off steps  1260/1260 1260/1260 1259/1260 1260/13
+ac0:  ENGMVX Axis=4 n=12346
+acc:  ENGMVY dy=3 ??=63
+ad8:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+af4:  ENGMVX Axis=4 n=-12356
+b00:  ENGMVY dy=3 ??=63
+b0c:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+b28:  ENGMVX Axis=4 n=12356
+b34:  ENGMVY dy=3 ??=63
+b40:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+b5c:  ENGMVX Axis=4 n=-12356
+b68:  ENGMVY dy=3 ??=63
+b74:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+b90:  ENGMVX Axis=4 n=12356
+b9c:  ENGMVY dy=3 ??=63
+ba8:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+bc4:  ENGMVX Axis=4 n=-12356
+bd0:  ENGMVY dy=3 ??=63
+bdc:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+bf8:  ENGMVX Axis=4 n=12356
+c04:  ENGMVY dy=3 ??=63
+c10:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+c2c:  ENGMVX Axis=4 n=-12356
+c38:  ENGMVY dy=3 ??=63
+c44:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+c60:  ENGMVX Axis=4 n=12356
+c6c:  ENGMVY dy=3 ??=63
+c78:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+c94:  ENGMVX Axis=4 n=-12356
+ca0:  ENGMVY dy=3 ??=63
+cac:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+cc8:  ENGMVX Axis=4 n=12356
+cd4:  ENGMVY dy=3 ??=63
+ce0:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+cfc:  ENGMVX Axis=4 n=-12356
+d08:  ENGMVY dy=3 ??=63
+d14:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+d30:  ENGMVX Axis=4 n=12356
+d3c:  ENGMVY dy=3 ??=63
+d48:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+d64:  ENGMVX Axis=4 n=-12356
+d70:  ENGMVY dy=3 ??=63
+d7c:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+d98:  ENGMVX Axis=4 n=12356
+da4:  ENGMVY dy=3 ??=63
+db0:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+dcc:  ENGMVX Axis=4 n=-12356
+dd8:  ENGMVY dy=3 ??=63
+de4:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+e00:  ENGMVX Axis=4 n=12356
+e0c:  ENGMVY dy=3 ??=63
+e18:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+e34:  ENGMVX Axis=4 n=-12356
+e40:  ENGMVY dy=3 ??=63
+e4c:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+e68:  ENGMVX Axis=4 n=12356
+e74:  ENGMVY dy=3 ??=63
+e80:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1260/1260 1260/1260 1260/1259 1260/3
+e9c:  ENGMVX Axis=4 n=-12356
+ea8:  ENGMVY dy=3 ??=63
+eb4:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+ec8:  ENGMVX Axis=4 n=12356
+ed4:  ENGMVY dy=3 ??=63
+ee0:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+ef4:  ENGMVX Axis=4 n=-12356
+f00:  ENGMVY dy=3 ??=63
+f0c:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+f20:  ENGMVX Axis=4 n=12356
+f2c:  ENGMVY dy=3 ??=63
+f38:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+f4c:  ENGMVX Axis=4 n=-12356
+f58:  ENGMVY dy=3 ??=63
+f64:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+f78:  ENGMVX Axis=4 n=12356
+f84:  ENGMVY dy=3 ??=63
+f90:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+fa4:  ENGMVX Axis=4 n=-12356
+fb0:  ENGMVY dy=3 ??=63
+fbc:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+fd0:  ENGMVX Axis=4 n=12356
+fdc:  ENGMVY dy=3 ??=63
+fe8:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+ffc:  ENGMVX Axis=4 n=-12356
+1008:  ENGMVY dy=3 ??=63
+1014:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+1028:  ENGMVX Axis=4 n=12356
+1034:  ENGMVY dy=3 ??=63
+1040:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+1054:  ENGMVX Axis=4 n=-12356
+1060:  ENGMVY dy=3 ??=63
+106c:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+1080:  ENGMVX Axis=4 n=12356
+108c:  ENGMVY dy=3 ??=63
+1098:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+10ac:  ENGMVX Axis=4 n=-12356
+10b8:  ENGMVY dy=3 ??=63
+10c4:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+10d8:  ENGMVX Axis=4 n=12356
+10e4:  ENGMVY dy=3 ??=63
+10f0:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+1104:  ENGMVX Axis=4 n=-12356
+1110:  ENGMVY dy=3 ??=63
+111c:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+1130:  ENGMVX Axis=4 n=12356
+113c:  ENGMVY dy=3 ??=63
+1148:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+115c:  ENGMVX Axis=4 n=-12356
+1168:  ENGMVY dy=3 ??=63
+1174:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+1188:  ENGMVX Axis=4 n=12356
+1194:  ENGMVY dy=3 ??=63
+11a0:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+11b4:  ENGMVX Axis=4 n=-12356
+11c0:  ENGMVY dy=3 ??=63
+11cc:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+11e0:  ENGMVX Axis=4 n=12356
+11ec:  ENGMVY dy=3 ??=63
+11f8:  ENGLSR List of steps=List of 3 On/Off steps  0/10 3780/1260 3779/3
+120c:  ENGMVX Axis=4 n=-12356
+1218:  ENGMVY dy=3 ??=63
+1224:  ENGLSR List of steps=List of 3 On/Off steps  0/1270 1260/3780 1259/15
+1238:  ENGMVX Axis=4 n=11096
+1244:  ENGMVY dy=3 ??=63
+1250:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1260/3780 1260/26
+1264:  ENGMVX Axis=4 n=-9836
+1270:  ENGMVY dy=3 ??=63
+127c:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1260/3780 1260/26
+1290:  ENGMVX Axis=4 n=9836
+129c:  ENGMVY dy=3 ??=63
+12a8:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1260/3780 1260/26
+12bc:  ENGMVX Axis=4 n=-9836
+12c8:  ENGMVY dy=3 ??=63
+12d4:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1260/3780 1260/26
+12e8:  ENGMVX Axis=4 n=9836
+12f4:  ENGMVY dy=3 ??=63
+1300:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1260/3780 1260/26
+1314:  ENGMVX Axis=4 n=-9836
+1320:  ENGMVY dy=3 ??=63
+132c:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1260/3780 1260/26
+1340:  ENGMVX Axis=4 n=9836
+134c:  ENGMVY dy=3 ??=63
+1358:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1260/3780 1260/26
+136c:  ENGMVX Axis=4 n=-9836
+1378:  ENGMVY dy=3 ??=63
+1384:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1260/3780 1260/26
+1398:  ENGMVX Axis=4 n=9836
+13a4:  ENGMVY dy=3 ??=63
+13b0:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1260/3780 1260/26
+13c4:  ENGMVX Axis=4 n=-9836
+13d0:  ENGMVY dy=3 ??=63
+13dc:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1694 392/1694 1260/26
+13f4:  ENGMVX Axis=4 n=9836
+1400:  ENGMVY dy=3 ??=63
+140c:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1559 662/1559 1260/26
+1424:  ENGMVX Axis=4 n=-9836
+1430:  ENGMVY dy=3 ??=63
+143c:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1473 834/1473 1260/26
+1454:  ENGMVX Axis=4 n=9836
+1460:  ENGMVY dy=3 ??=63
+146c:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1412 956/1412 1260/26
+1484:  ENGMVX Axis=4 n=-9836
+1490:  ENGMVY dy=3 ??=63
+149c:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1364 1052/1364 1260/26
+14b4:  ENGMVX Axis=4 n=9836
+14c0:  ENGMVY dy=3 ??=63
+14cc:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1328 1124/1328 1260/26
+14e4:  ENGMVX Axis=4 n=-9836
+14f0:  ENGMVY dy=3 ??=63
+14fc:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1300 1180/1300 1260/26
+1514:  ENGMVX Axis=4 n=9836
+1520:  ENGMVY dy=3 ??=63
+152c:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1280 1220/1280 1260/26
+1544:  ENGMVX Axis=4 n=-9836
+1550:  ENGMVY dy=3 ??=63
+155c:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1267 1245/1268 1260/26
+1574:  ENGMVX Axis=4 n=9836
+1580:  ENGMVY dy=3 ??=63
+158c:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1260/1261 1258/1261 1260/26
+15a4:  ENGMVX Axis=4 n=-9836
+15b0:  ENGMVY dy=3 ??=63
+15bc:  ENGLSR List of steps=List of 2 On/Off steps  0/2531 1258/19
+15cc:  ENGMVX Axis=4 n=7316
+15d8:  ENGMVY dy=3 ??=63
+15e4:  ENGLSR List of steps=List of 2 On/Off steps  0/17 1245/18
+15f4:  ENGMVX Axis=4 n=-4789
+1600:  ENGMVY dy=3 ??=63
+160c:  ENGLSR List of steps=List of 2 On/Off steps  0/23 1220/5
+161c:  ENGMVX Axis=4 n=4769
+1628:  ENGMVY dy=3 ??=63
+1634:  ENGLSR List of steps=List of 2 On/Off steps  0/30 1180/6
+1644:  ENGMVX Axis=4 n=-4737
+1650:  ENGMVY dy=3 ??=63
+165c:  ENGLSR List of steps=List of 2 On/Off steps  0/38 1124/22
+166c:  ENGMVX Axis=4 n=4690
+1678:  ENGMVY dy=3 ??=63
+1684:  ENGLSR List of steps=List of 2 On/Off steps  0/47 1052/3861
+1694:  ENGMVX Axis=4 n=-8456
+16a0:  ENGMVY dy=3 ??=63
+16ac:  ENGLSR List of steps=List of 6 On/Off steps  406/615 25/12 898/74 74/12 345/1427 957/19
+16cc:  ENGMVX Axis=4 n=8372
+16d8:  ENGMVY dy=3 ??=63
+16e4:  ENGLSR List of steps=List of 6 On/Off steps  0/72 833/1465 1095/12 369/49 12/505 443/9
+1704:  ENGMVX Axis=4 n=-8382
+1710:  ENGMVY dy=3 ??=63
+171c:  ENGLSR List of steps=List of 4 On/Off steps  0/10 492/443 1575/1525 663/28
+1734:  ENGMVX Axis=4 n=8235
+1740:  ENGMVY dy=3 ??=63
+174c:  ENGLSR List of steps=List of 4 On/Off steps  0/146 392/1672 1587/369 542/28
+1764:  ENGMVX Axis=4 n=-8235
+1770:  ENGMVY dy=3 ??=63
+177c:  ENGLSR List of steps=List of 5 On/Off steps  0/10 579/344 283/98 37/74 1058/13
+1798:  ENGMVX Axis=4 n=6011
+17a4:  ENGMVY dy=3 ??=63
+17b0:  ENGLSR List of steps=List of 8 On/Off steps  0/35 1021/25 197/36 50/61 25/37 61/136 12/307 480/13
+17d8:  ENGMVX Axis=4 n=-6011
+17e4:  ENGMVY dy=3 ??=63
+17f0:  ENGLSR List of steps=List of 5 On/Off steps  0/10 320/394 37/135 25/98 1415/30
+180c:  ENGMVX Axis=4 n=5961
+1818:  ENGMVY dy=3 ??=63
+1824:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1514/147 49/579 135/30
+183c:  ENGMVX Axis=4 n=-5961
+1848:  ENGMVY dy=3 ??=63
+1854:  ENGLSR List of steps=List of 5 On/Off steps  0/662 148/49 25/24 431/37 1058/30
+1870:  ENGMVX Axis=4 n=5961
+187c:  ENGMVY dy=3 ??=63
+1888:  ENGLSR List of steps=List of 3 On/Off steps  0/23 1538/36 185/42
+189c:  ENGMVX Axis=4 n=-5323
+18a8:  ENGMVY dy=3 ??=63
+18b4:  ENGLSR List of steps=List of 2 On/Off steps  222/49 1501/20
+18c4:  ENGMVX Axis=4 n=5299
+18d0:  ENGMVY dy=3 ??=63
+18dc:  ENGLSR List of steps=List of 4 On/Off steps  0/10 1477/86 234/37 24/20
+18f4:  ENGMVX Axis=4 n=-5396
+1900:  ENGMVY dy=3 ??=63
+190c:  ENGLSR List of steps=List of 2 On/Off steps  0/60 1808/20
+191c:  ENGMVX Axis=4 n=5410
+1928:  ENGMVY dy=3 ??=63
+1934:  ENGLSR List of steps=List of 2 On/Off steps  1157/24 677/30
+1944:  ENGMVX Axis=4 n=-5387
+1950:  ENGMVY dy=3 ??=63
+195c:  ENGLSR List of steps=List of 1 On/Off steps  1907/45
+1968:  ENGMVX Axis=4 n=5473
+1974:  ENGMVY dy=3 ??=63
+1980:  ENGLSR List of steps=List of 1 On/Off steps  1981/35
+198c:  ENGMVX Axis=4 n=-5510
+1998:  ENGMVY dy=3 ??=63
+19a4:  ENGLSR List of steps=List of 1 On/Off steps  2030/18
+19b0:  ENGMVX Axis=4 n=5557
+19bc:  ENGMVY dy=3 ??=63
+19c8:  ENGLSR List of steps=List of 4 On/Off steps  0/23 1476/37 135/49 283/13
+19e0:  ENGMVX Axis=4 n=-5530
+19ec:  ENGMVY dy=3 ??=63
+19f8:  ENGLSR List of steps=List of 6 On/Off steps  0/23 12/12 246/111 12/25 640/61 886/52
+1a18:  ENGMVX Axis=4 n=5582
+1a24:  ENGMVY dy=3 ??=63
+1a30:  ENGLSR List of steps=List of 4 On/Off steps  886/172 542/147 197/25 24/23
+1a48:  ENGMVX Axis=4 n=-5521
+1a54:  ENGMVY dy=3 ??=63
+1a60:  ENGLSR List of steps=List of 4 On/Off steps  0/121 12/37 111/123 1612/32
+1a78:  ENGMVX Axis=4 n=5545
+1a84:  ENGMVY dy=3 ??=62
+1a90:  ENGLSR List of steps=List of 6 On/Off steps  1612/111 24/37 37/25 12/37 12/25 12/72
+1ab0:  ENGMVX Axis=4 n=-5535
+1abc:  ENGMVY dy=3 ??=63
+1ac8:  ENGLSR List of steps=List of 2 On/Off steps  320/86 1624/18
+1ad8:  ENGMVX Axis=4 n=5560
+1ae4:  ENGMVY dy=3 ??=63
+1af0:  ENGLSR List of steps=List of 3 On/Off steps  86/37 1551/24 332/18
+1b04:  ENGMVX Axis=4 n=-5557
+1b10:  ENGMVY dy=3 ??=63
+1b1c:  ENGLSR List of steps=List of 4 On/Off steps  0/23 1821/36 25/49 99/27
+1b34:  ENGMVX Axis=4 n=5582
+1b40:  ENGMVY dy=3 ??=63
+1b4c:  ENGLSR List of steps=List of 5 On/Off steps  1243/25 319/13 270/37 234/123 25/15
+1b68:  ENGMVX Axis=4 n=-5816
+1b74:  ENGMVY dy=3 ??=63
+1b80:  ENGLSR List of steps=List of 4 On/Off steps  0/23 12/135 13/24 2092/5
+1b98:  ENGMVX Axis=4 n=5828
+1ba4:  ENGMVY dy=3 ??=63
+1bb0:  ENGLSR List of steps=List of 3 On/Off steps  2018/12 136/98 25/15
+1bc4:  ENGMVX Axis=4 n=-5816
+1bd0:  ENGMVY dy=3 ??=63
+1bdc:  ENGLSR List of steps=List of 3 On/Off steps  0/10 37/111 2128/18
+1bf0:  ENGMVX Axis=4 n=5814
+1bfc:  ENGMVY dy=3 ??=63
+1c08:  ENGLSR List of steps=List of 4 On/Off steps  0/23 2067/12 25/123 36/18
+1c20:  ENGMVX Axis=4 n=-5814
+1c2c:  ENGMVY dy=3 ??=63
+1c38:  ENGLSR List of steps=List of 5 On/Off steps  0/23 37/270 234/12 13/24 1649/10
+1c54:  ENGMVX Axis=4 n=5789
+1c60:  ENGMVY dy=3 ??=63
+1c6c:  ENGLSR List of steps=List of 7 On/Off steps  0/23 1476/111 160/37 24/49 13/320 24/25 12/30
+1c90:  ENGMVX Axis=4 n=-5801
+1c9c:  ENGMVY dy=3 ??=63
+1ca8:  ENGLSR List of steps=List of 8 On/Off steps  0/60 12/430 37/13 135/12 62/24 13/12 49/13 1390/10
+1cd0:  ENGMVX Axis=4 n=5789
+1cdc:  ENGMVY dy=3 ??=63
+1ce8:  ENGLSR List of steps=List of 5 On/Off steps  0/10 1464/111 49/13 49/492 25/27
+1d04:  ENGMVX Axis=4 n=-5740
+1d10:  ENGMVY dy=3 ??=63
+1d1c:  ENGLSR List of steps=List of 8 On/Off steps  0/10 37/406 13/61 37/37 12/37 99/12 24/25 1390/8
+1d44:  ENGMVX Axis=4 n=5728
+1d50:  ENGMVY dy=3 ??=63
+1d5c:  ENGLSR List of steps=List of 6 On/Off steps  0/23 1402/25 61/25 25/98 61/443 13/32
+1d7c:  ENGMVX Axis=4 n=-5703
+1d88:  ENGMVY dy=3 ??=63
+1d94:  ENGLSR List of steps=List of 6 On/Off steps  0/47 13/602 62/25 86/12 37/12 1267/13
+1db4:  ENGMVX Axis=4 n=5690
+1dc0:  ENGMVY dy=3 ??=63
+1dcc:  ENGLSR List of steps=List of 3 On/Off steps  0/10 1551/529 12/10
+1de0:  ENGMVX Axis=4 n=-5629
+1dec:  ENGMVY dy=3 ??=63
+1df8:  ENGLSR List of steps=List of 3 On/Off steps  0/23 37/504 1526/22
+1e0c:  ENGMVX Axis=4 n=5617
+1e18:  ENGMVY dy=3 ??=63
+1e24:  ENGLSR List of steps=List of 3 On/Off steps  0/23 1513/455 49/8
+1e38:  ENGMVX Axis=4 n=-5568
+1e44:  ENGMVY dy=3 ??=63
+1e50:  ENGLSR List of steps=List of 3 On/Off steps  0/10 111/381 1489/25
+1e64:  ENGMVX Axis=4 n=5519
+1e70:  ENGMVY dy=3 ??=63
+1e7c:  ENGLSR List of steps=List of 4 On/Off steps  0/23 1501/86 86/148 61/15
+1e94:  ENGMVX Axis=4 n=-5433
+1ea0:  ENGMVY dy=3 ??=63
+1eac:  ENGLSR List of steps=List of 3 On/Off steps  0/72 74/12 1710/20
+1ec0:  ENGMVX Axis=4 n=5396
+1ecc:  ENGMVY dy=3 ??=63
+1ed8:  ENGLSR List of steps=List of 2 On/Off steps  0/23 1697/8
+1ee8:  ENGMVX Axis=4 n=-5248
+1ef4:  ENGMVY dy=3 ??=63
+1f00:  ENGLSR List of steps=List of 3 On/Off steps  0/60 123/12 1476/25
+1f14:  ENGMVX Axis=4 n=5199
+1f20:  ENGMVY dy=3 ??=63
+1f2c:  ENGLSR List of steps=List of 4 On/Off steps  0/72 1378/37 12/12 86/3
+1f44:  ENGMVX Axis=4 n=-5125
+1f50:  ENGMVY dy=3 ??=63
+1f5c:  ENGLSR List of steps=List of 2 On/Off steps  0/207 1280/17
+1f6c:  ENGMVX Axis=4 n=5014
+1f78:  ENGMVY dy=3 ??=63
+1f84:  ENGLSR List of steps=List of 4 On/Off steps  0/109 1082/62 61/13 24/25
+1f9c:  ENGMVX Axis=4 n=-4879
+1fa8:  ENGMVY dy=3 ??=63
+1fb4:  ENGLSR List of steps=List of 4 On/Off steps  0/195 61/37 652/148 25/2
+1fcc:  ENGMVX Axis=4 n=4645
+1fd8:  ENGMVY dy=3 ??=63
+1fe4:  ENGLSR List of steps=List of 3 On/Off steps  0/269 307/25 98/5
+1ff8:  ENGMVX Axis=4 n=-4226
+2004: Unknown: 01000b46 Params 1:  00000200
+200c:  ENGLSR List of steps=List of 2 On/Off steps  0/36 0/0
+201c:  ENDSUB n=3
+2024: END
+Calling subr 3 with position (1,1)
+Start points: 2
+ 1 : x=0,y=0
+ 2 : x=0,y=0

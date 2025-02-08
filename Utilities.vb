@@ -1,5 +1,4 @@
 ﻿Imports System.Runtime.InteropServices
-Imports MOL.Form1
 Imports netDxf
 
 ' Miscellaneous SHARED routines that don't belong in a class
@@ -10,6 +9,9 @@ Module Utilities
         Public i As UInteger
         <FieldOffset(0)> Dim f As Single
     End Structure
+
+    Public ScaleUnity = New Matrix3(1, 0, 0, 0, 1, 0, 0, 0, 1)             ' scale factor of 1
+    Public ScaleMM = New Matrix3(1 / Form1.xScale, 0, 0, 0, 1 / Form1.yScale, 0, 0, 0, 0)    ' scale steps to mm
     Function Leetro2Float(b As UInteger) As Single
         ' Converts a custom Leetro floating-point format to an IEEE 754 floating-point number.
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
@@ -56,5 +58,16 @@ Module Utilities
     Function Distance(p1 As Vector2, p2 As Vector2) As Single
         ' Calculate the distance between two points
         Return Math.Sqrt((p1.X - p2.X) ^ 2 + (p1.Y - p2.Y) ^ 2)
+    End Function
+
+    Function Vect3(vect2 As Vector2) As Vector3
+        ' Convert a Vector2 type to a Vector3 type
+        Dim result As New Vector3
+        With result
+            .X = vect2.X
+            .Y = vect2.Y
+            .Z = 0
+        End With
+        Return result
     End Function
 End Module
