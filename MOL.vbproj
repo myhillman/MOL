@@ -35,10 +35,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Samples\FOUR.MOL">
+    <None Update="FOUR.MOL">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Samples\minimario.txt">
+    <None Update="minimario.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="My Project\Application.myapp">

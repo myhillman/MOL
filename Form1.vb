@@ -312,6 +312,7 @@ Public Class Form1
         ' write float at current offset
         If UseMCB Then
             MotionControlBlock.Add(Float2Int(f))
+            If MotionControlBlock.Count >= MCBMax Then FlushMCB()      ' MCB limited in size
         Else
             writer.Write(Float2Int(f))
         End If
@@ -321,6 +322,7 @@ Public Class Form1
         ' write n at current offset
         If UseMCB Then
             MotionControlBlock.Add(n)
+            If MotionControlBlock.Count >= MCBMax Then FlushMCB()      ' MCB limited in size
         Else
             writer.Write(n)
         End If
@@ -943,23 +945,19 @@ Public Class Form1
                 End Select
             Next
         End If
-        If MotionControlBlock.Count >= MCBMax Then FlushMCB()      ' MCB limited in size
     End Sub
 
     Sub FlushMCB()
         ' Flush the contents of the MotionControlBlock
-        If UseMCB Then
-            UseMCB = False            ' Disable MCB buffering
-            If MotionControlBlock.Count > 0 Then
-                PutInt(MOL_MCB) : PutInt(MotionControlBlock.Count)   ' write MCB command and count
-                ' Write the contents of the MCB
-                For Each item In MotionControlBlock
-                    PutInt(item)
-                Next
-                MotionControlBlock.Clear()          ' clear the buffer
-                MCBCount += 1                        ' count MCB
-            End If
-            UseMCB = True             ' turn MCB buffering back on
+        UseMCB = False    ' turn off MCB buffer
+        If MotionControlBlock.Count > 0 Then
+            WriteMOL(MOL_MCB, {MotionControlBlock.Count})   ' write MCB command and count
+        ' Write the contents of the MCB
+        For Each item In MotionControlBlock
+            PutInt(item)
+        Next
+        MotionControlBlock.Clear()          ' clear the buffer
+            MCBCount += 1                        ' count MCB
         End If
     End Sub
     Sub MOVERELSPLIT(p As Vector2, pieces As Integer)
