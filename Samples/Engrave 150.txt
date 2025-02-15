@@ -1,0 +1,7 @@
+a08: Unknown: 01000d46 Params 1:  00000bb8
+a10: Unknown: 01000646 Params 1:  00000002
+a18:  ENGACD x=13.993813 mm
+a20: Unknown: 01000246 Params 1:  00000000
+a28: Unknown: 02014341 Params 2:  00000004 0e13a200
+a34: Unknown: 04010141 Params 4:  00000004 0c6c3800 0e13a200 13574e10
+a48: Unknown: 02010041 Params 2:  00000003 0b6c3000

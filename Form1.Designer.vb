@@ -37,10 +37,14 @@ Partial Class Form1
         HEXDUMPOFFToolStripMenuItem = New ToolStripMenuItem()
         DEBUGONToolStripMenuItem = New ToolStripMenuItem()
         DEBUGOFFToolStripMenuItem = New ToolStripMenuItem()
+        ConvertLeetroToIEEEToolStripMenuItem = New ToolStripMenuItem()
         TestToolStripMenuItem = New ToolStripMenuItem()
         WordAccessToolStripMenuItem = New ToolStripMenuItem()
         TestIEEEToLeetroFpConversionToolStripMenuItem = New ToolStripMenuItem()
         TextTestToolStripMenuItem = New ToolStripMenuItem()
+        BoxTestToolStripMenuItem = New ToolStripMenuItem()
+        LineTestToolStripMenuItem = New ToolStripMenuItem()
+        SHXTestToolStripMenuItem = New ToolStripMenuItem()
         TextBox1 = New TextBox()
         ProgressBar1 = New ProgressBar()
         MenuStrip1.SuspendLayout()
@@ -112,7 +116,7 @@ Partial Class Form1
         ' 
         ' DebugToolStripMenuItem
         ' 
-        DebugToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {HEXDUMPONToolStripMenuItem, HEXDUMPOFFToolStripMenuItem, DEBUGONToolStripMenuItem, DEBUGOFFToolStripMenuItem})
+        DebugToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {HEXDUMPONToolStripMenuItem, HEXDUMPOFFToolStripMenuItem, DEBUGONToolStripMenuItem, DEBUGOFFToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem})
         DebugToolStripMenuItem.Name = "DebugToolStripMenuItem"
         DebugToolStripMenuItem.Size = New Size(54, 20)
         DebugToolStripMenuItem.Text = "Debug"
@@ -120,30 +124,36 @@ Partial Class Form1
         ' HEXDUMPONToolStripMenuItem
         ' 
         HEXDUMPONToolStripMenuItem.Name = "HEXDUMPONToolStripMenuItem"
-        HEXDUMPONToolStripMenuItem.Size = New Size(154, 22)
+        HEXDUMPONToolStripMenuItem.Size = New Size(190, 22)
         HEXDUMPONToolStripMenuItem.Text = "HEXDUMP ON"
         ' 
         ' HEXDUMPOFFToolStripMenuItem
         ' 
         HEXDUMPOFFToolStripMenuItem.Name = "HEXDUMPOFFToolStripMenuItem"
-        HEXDUMPOFFToolStripMenuItem.Size = New Size(154, 22)
+        HEXDUMPOFFToolStripMenuItem.Size = New Size(190, 22)
         HEXDUMPOFFToolStripMenuItem.Text = "HEXDUMP OFF"
         ' 
         ' DEBUGONToolStripMenuItem
         ' 
         DEBUGONToolStripMenuItem.Name = "DEBUGONToolStripMenuItem"
-        DEBUGONToolStripMenuItem.Size = New Size(154, 22)
+        DEBUGONToolStripMenuItem.Size = New Size(190, 22)
         DEBUGONToolStripMenuItem.Text = "DEBUG ON"
         ' 
         ' DEBUGOFFToolStripMenuItem
         ' 
         DEBUGOFFToolStripMenuItem.Name = "DEBUGOFFToolStripMenuItem"
-        DEBUGOFFToolStripMenuItem.Size = New Size(154, 22)
+        DEBUGOFFToolStripMenuItem.Size = New Size(190, 22)
         DEBUGOFFToolStripMenuItem.Text = "DEBUG OFF"
+        ' 
+        ' ConvertLeetroToIEEEToolStripMenuItem
+        ' 
+        ConvertLeetroToIEEEToolStripMenuItem.Name = "ConvertLeetroToIEEEToolStripMenuItem"
+        ConvertLeetroToIEEEToolStripMenuItem.Size = New Size(190, 22)
+        ConvertLeetroToIEEEToolStripMenuItem.Text = "Convert Leetro to IEEE"
         ' 
         ' TestToolStripMenuItem
         ' 
-        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem})
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, BoxTestToolStripMenuItem, LineTestToolStripMenuItem, SHXTestToolStripMenuItem})
         TestToolStripMenuItem.Name = "TestToolStripMenuItem"
         TestToolStripMenuItem.Size = New Size(40, 20)
         TestToolStripMenuItem.Text = "Test"
@@ -165,6 +175,24 @@ Partial Class Form1
         TextTestToolStripMenuItem.Name = "TextTestToolStripMenuItem"
         TextTestToolStripMenuItem.Size = New Size(244, 22)
         TextTestToolStripMenuItem.Text = "Text test"
+        ' 
+        ' BoxTestToolStripMenuItem
+        ' 
+        BoxTestToolStripMenuItem.Name = "BoxTestToolStripMenuItem"
+        BoxTestToolStripMenuItem.Size = New Size(244, 22)
+        BoxTestToolStripMenuItem.Text = "Box test"
+        ' 
+        ' LineTestToolStripMenuItem
+        ' 
+        LineTestToolStripMenuItem.Name = "LineTestToolStripMenuItem"
+        LineTestToolStripMenuItem.Size = New Size(244, 22)
+        LineTestToolStripMenuItem.Text = "Line Test"
+        ' 
+        ' SHXTestToolStripMenuItem
+        ' 
+        SHXTestToolStripMenuItem.Name = "SHXTestToolStripMenuItem"
+        SHXTestToolStripMenuItem.Size = New Size(244, 22)
+        SHXTestToolStripMenuItem.Text = "SHX test"
         ' 
         ' TextBox1
         ' 
@@ -223,5 +251,9 @@ Partial Class Form1
     Friend WithEvents CommandSummaryToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents DisassembleToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents RenderToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents BoxTestToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents LineTestToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents SHXTestToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ConvertLeetroToIEEEToolStripMenuItem As ToolStripMenuItem
 
 End Class
