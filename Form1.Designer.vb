@@ -43,6 +43,10 @@ Partial Class Form1
         TextTestToolStripMenuItem = New ToolStripMenuItem()
         TextBox1 = New TextBox()
         ProgressBar1 = New ProgressBar()
+        LineTestToolStripMenuItem = New ToolStripMenuItem()
+        BoxTestToolStripMenuItem = New ToolStripMenuItem()
+        SHXTestToolStripMenuItem = New ToolStripMenuItem()
+        ConvertLeetroToIEEEToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
@@ -120,30 +124,30 @@ Partial Class Form1
         ' HEXDUMPONToolStripMenuItem
         ' 
         HEXDUMPONToolStripMenuItem.Name = "HEXDUMPONToolStripMenuItem"
-        HEXDUMPONToolStripMenuItem.Size = New Size(154, 22)
+        HEXDUMPONToolStripMenuItem.Size = New Size(180, 22)
         HEXDUMPONToolStripMenuItem.Text = "HEXDUMP ON"
         ' 
         ' HEXDUMPOFFToolStripMenuItem
         ' 
         HEXDUMPOFFToolStripMenuItem.Name = "HEXDUMPOFFToolStripMenuItem"
-        HEXDUMPOFFToolStripMenuItem.Size = New Size(154, 22)
+        HEXDUMPOFFToolStripMenuItem.Size = New Size(180, 22)
         HEXDUMPOFFToolStripMenuItem.Text = "HEXDUMP OFF"
         ' 
         ' DEBUGONToolStripMenuItem
         ' 
         DEBUGONToolStripMenuItem.Name = "DEBUGONToolStripMenuItem"
-        DEBUGONToolStripMenuItem.Size = New Size(154, 22)
+        DEBUGONToolStripMenuItem.Size = New Size(180, 22)
         DEBUGONToolStripMenuItem.Text = "DEBUG ON"
         ' 
         ' DEBUGOFFToolStripMenuItem
         ' 
         DEBUGOFFToolStripMenuItem.Name = "DEBUGOFFToolStripMenuItem"
-        DEBUGOFFToolStripMenuItem.Size = New Size(154, 22)
+        DEBUGOFFToolStripMenuItem.Size = New Size(180, 22)
         DEBUGOFFToolStripMenuItem.Text = "DEBUG OFF"
         ' 
         ' TestToolStripMenuItem
         ' 
-        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem})
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, SHXTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem})
         TestToolStripMenuItem.Name = "TestToolStripMenuItem"
         TestToolStripMenuItem.Size = New Size(40, 20)
         TestToolStripMenuItem.Text = "Test"
@@ -184,6 +188,30 @@ Partial Class Form1
         ProgressBar1.Size = New Size(1023, 21)
         ProgressBar1.TabIndex = 2
         ' 
+        ' LineTestToolStripMenuItem
+        ' 
+        LineTestToolStripMenuItem.Name = "LineTestToolStripMenuItem"
+        LineTestToolStripMenuItem.Size = New Size(244, 22)
+        LineTestToolStripMenuItem.Text = "Line test"
+        ' 
+        ' BoxTestToolStripMenuItem
+        ' 
+        BoxTestToolStripMenuItem.Name = "BoxTestToolStripMenuItem"
+        BoxTestToolStripMenuItem.Size = New Size(244, 22)
+        BoxTestToolStripMenuItem.Text = "Box test"
+        ' 
+        ' SHXTestToolStripMenuItem
+        ' 
+        SHXTestToolStripMenuItem.Name = "SHXTestToolStripMenuItem"
+        SHXTestToolStripMenuItem.Size = New Size(244, 22)
+        SHXTestToolStripMenuItem.Text = "SHX test"
+        ' 
+        ' ConvertLeetroToIEEEToolStripMenuItem
+        ' 
+        ConvertLeetroToIEEEToolStripMenuItem.Name = "ConvertLeetroToIEEEToolStripMenuItem"
+        ConvertLeetroToIEEEToolStripMenuItem.Size = New Size(244, 22)
+        ConvertLeetroToIEEEToolStripMenuItem.Text = "Convert Leetro to IEEE"
+        ' 
         ' Form1
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
@@ -223,5 +251,9 @@ Partial Class Form1
     Friend WithEvents CommandSummaryToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents DisassembleToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents RenderToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents LineTestToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents BoxTestToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents SHXTestToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ConvertLeetroToIEEEToolStripMenuItem As ToolStripMenuItem
 
 End Class

@@ -12,44 +12,44 @@ Module Utilities
 
     Public ScaleUnity = New Matrix3(1, 0, 0, 0, 1, 0, 0, 0, 1)             ' scale factor of 1
     Public ScaleMM = New Matrix3(1 / Form1.xScale, 0, 0, 0, 1 / Form1.yScale, 0, 0, 0, 0)    ' scale steps to mm
-    Function Leetro2Float(b As UInteger) As Single
+    Public Function Leetro2Float(b As Long) As Single
         ' Converts a custom Leetro floating-point format to an IEEE 754 floating-point number.
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
+
+        Dim ieee As IntFloatUnion
         If b = 0 Then Return 0.0          ' special case
-        If b = &H81000000UL Then Return 1.0
-        Dim vExp As Integer = (b >> 24)  ' exponent stored as -127 - 128
-        Dim vMan As Integer = (b >> 9 And &H3FFF) Or 2 ^ 14   ' mantissa (adding implied leading bit)
+        Dim vExp As Integer = (b >> 24)
+        vExp += 127 And &HFF            ' IEEE exponent bias
+        Dim vMan As Integer = b And &H7FFFFF    ' Even though Leetro numbers usually have the bottom 9 bits = 0, sometimes they don't. We will support a Leetro mantissa of 23 bits
         Dim vSgn As Integer = b >> 23 And 1         ' sign
-        If vSgn > 0 Then vSgn = -1 Else vSgn = 1
-        Dim significand As Single = vMan / 16384.0
-        Dim result As Single = significand * Math.Pow(2, vExp) * vSgn
-        Return result
+        ieee.i = (vSgn << 31) Or (vExp << 23) Or vMan
+        Return ieee.f   ' return floating point
     End Function
 
-    Function Float2Int(f As Single) As UInteger
+    Function Float2Leetro(f As Single) As Integer
         ' Convert integer to Leetro float
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
         ' IEEE float format    [seeeeeee|emmmmmmm|mmmmmmmm|mmmmmmmm]
+
         Dim ieee As IntFloatUnion
         ieee.f = f
         ' Handle special cases
         If ieee.i = 0 Then Return 0 ' Zero case
         If ieee.i = &H3F800000 Then Return 1 ' One case
-        Dim leetro As UInteger = 0          ' Leetro version
-        If ieee.f < 0 Then leetro = leetro Or &H800000     ' transfer sign bit 
-        Dim exp As Integer = ieee.i >> 23   ' ieee floats have a 127 exp bias, leetro does not
-        exp = exp And &HFF    ' reduce exp to 8 bits
-        exp -= 127
+        Dim vSgn = (ieee.i >> 31) And 1     ' extract sign bit
+        Dim exp As Integer = (ieee.i >> 23) And &HFF
+        exp -= 127          ' ieee floats have a 127 exp bias, leetro does not
         exp = exp And &HFF
-        Dim exponent As Long = (exp << 24) And &HFF000000L
-        leetro = leetro Or CUInt(exponent)             ' add exponent
-        Dim significand As Integer = ieee.i And &H7FFFFF
-        leetro = leetro Or significand
-        Return leetro
+        Dim vMan = ieee.i And &H7FFFFF      ' Even though Leetro numbers usually have the bottom 9 bits = 0, sometimes they don't. We will support a Leetro mantissa of 23 bits
+        ieee.i = (exp << 24) Or (vSgn << 23) Or vMan
+        Return ieee.i
     End Function
+
     Public Function PowerSpeedColor(power As Single, speed As Single) As AciColor
         ' Convert speed/power to an approximate color
         'Return AciColor.FromHsl(30 / 360, 0.6, CSng(power / 100) * (1 - (CSng(speed) / My.Settings.SpeedMax)))
+        If power > My.Settings.PowerMax Then Throw New System.Exception($"{power} is greater than maximum {My.Settings.PowerMax}")
+        If speed > My.Settings.SpeedMax Then Throw New System.Exception($"{speed} is greater than maximum {My.Settings.SpeedMax}")
         Dim pwr = (power - My.Settings.PowerMin) / (My.Settings.PowerMax - My.Settings.PowerMin)
         Dim spd = 1 - ((speed - My.Settings.SpeedMin) / (My.Settings.SpeedMax - My.Settings.SpeedMin))
         Return AciColor.FromHsl(0, 0, pwr * spd)
@@ -60,14 +60,4 @@ Module Utilities
         Return Math.Sqrt((p1.X - p2.X) ^ 2 + (p1.Y - p2.Y) ^ 2)
     End Function
 
-    Function Vect3(vect2 As Vector2) As Vector3
-        ' Convert a Vector2 type to a Vector3 type
-        Dim result As New Vector3
-        With result
-            .X = vect2.X
-            .Y = vect2.Y
-            .Z = 0
-        End With
-        Return result
-    End Function
 End Module
