@@ -6,7 +6,7 @@ Module Utilities
     ' Create a union so that a float can be accessed as a UInt
     <StructLayout(LayoutKind.Explicit)> Public Structure IntFloatUnion
         <FieldOffset(0)>
-        Public i As UInteger
+        Public i As Integer
         <FieldOffset(0)> Dim f As Single
     End Structure
 
@@ -19,7 +19,7 @@ Module Utilities
         Dim ieee As IntFloatUnion
         If b = 0 Then Return 0.0          ' special case
         Dim vExp As Integer = (b >> 24)
-        vExp += 127 And &HFF            ' IEEE exponent bias
+        vExp = (vExp + 127) And &HFF             ' IEEE exponent bias and remove sign extention
         Dim vMan As Integer = b And &H7FFFFF    ' Even though Leetro numbers usually have the bottom 9 bits = 0, sometimes they don't. We will support a Leetro mantissa of 23 bits
         Dim vSgn As Integer = b >> 23 And 1         ' sign
         ieee.i = (vSgn << 31) Or (vExp << 23) Or vMan
@@ -39,7 +39,7 @@ Module Utilities
         Dim vSgn = (ieee.i >> 31) And 1     ' extract sign bit
         Dim exp As Integer = (ieee.i >> 23) And &HFF
         exp -= 127          ' ieee floats have a 127 exp bias, leetro does not
-        exp = exp And &HFF
+        exp = exp And &HFF  ' remove any sign extension
         Dim vMan = ieee.i And &H7FFFFF      ' Even though Leetro numbers usually have the bottom 9 bits = 0, sometimes they don't. We will support a Leetro mantissa of 23 bits
         ieee.i = (exp << 24) Or (vSgn << 23) Or vMan
         Return ieee.i

@@ -71,11 +71,12 @@ Public Class Form1
     Private Stack As New Stack()                    ' used by GOSUB to hold return address
     Private motion As New Polyline2D                ' list of all laser moves
     Private layer As Layer                          ' currenr drawing layer
-    Private MotionControlBlock As New List(Of Integer)  ' buffer for commands which need to be in MCB
-    Private UseMCB As Boolean = False                 ' if ture write to MCB, else write to file
-    Private MCBCount As Integer = 0                   ' count of MCB generated
-    Private MOVERELCnt As Integer = 0                    ' Count of MOVEREL + &h264 + &h284
-    Private Const MCBMax = 508                           ' maximum words in a MCB
+    Private MCBLK As New List(Of Integer)           ' buffer for commands which need to be in MCBLK
+    Private UseMCBLK As Boolean = False                 ' if ture write to MCBLK, else write to file
+    Private MCBLKCount As Integer = 0                   ' count of MCBLK generated
+    Private MVRELCnt As Integer = 0                    ' Count of MVREL + &h264 + &h284
+    Private Const MCBLKMax = 508                           ' maximum words in a MCBLK
+    Private ChunksWithCode As New Dictionary(Of Integer, Boolean)      ' list of chunks known to contain code. Boolean is true if has been executed
 
 
     ' Variables that reflect the state of the laser cutter
@@ -99,10 +100,10 @@ Public Class Form1
     Private DrawChunks As New List(Of Integer)      ' list of draw chunks
     Private EmptyVector As New Vector2(0, 0)
     Private ENGLSRsteps As New List(Of OnOffSteps)
-    Private FirstMove As Boolean = True           ' true if next MOVEREL will be the first
-    Private STARTList As New List(Of IntPoint)      ' list of START positions encountered
+    Private FirstMove As Boolean = True           ' true if next MVREL will be the first
     Private EngPower As Integer             ' Engrave power (%)
     Private EngSpeed As Double              ' Engrave speed (mm/s)
+    Private MVRELInConfig As Integer      ' number of MVREL encountered so far in CONFIG section
 
     ' Define some layers for DXF file
     Private TextLayer As New Layer("Text") With {       ' text
@@ -178,45 +179,48 @@ Public Class Form1
         End Sub
     End Class
     ' Definitions of full (param count + command) MOL file commands
-    Const MOL_MOVEREL = &H3026000
-    Const MOL_START = &H3026040
-    Const MOL_ORIGIN = &H346040
-    Const MOTION_CMD_COUNT = &H3090080
-    Const MOL_BEGSUB = &H1300008
-    Const MOL_BEGSUBa = &H1300048
-    Const MOL_ENDSUB = &H1400048
-    Const MOL_MCB = &H80000946
-    Const MOL_SETSPD = &H3000301
-    Const MOL_MOTION = &H3000341
-    Const MOL_LASER = &H1000606
-    Const MOL_GOSUB = &H1500048
-    Const MOL_GOSUB3 = &H3500048
-    Const MOL_X5_FIRST = &H200548
-    Const MOL_X6_LAST = &H200648
-    Const MOL_ACCELERATION = &H1004601
-    Const MOL_BLOWER = &H1004A41
-    Const MOL_BLOWERa = &H1004B41
-    Const MOL_SEGMENT = &H500008
-    Const MOL_GOSUBn = &H80500048
-    Const MOL_ENGPWR = &H1000746
-    Const MOL_ENGPWR1 = &H2000746
-    Const MOL_ENGSPD = &H2014341
-    Const MOL_ENGSPD1 = &H4010141
-    Const MOL_ENGACD = &H1000346
-    Const MOL_ENGMVY = &H2010040
-    Const MOL_ENGMVX = &H2014040
-    Const MOL_SCALE = &H3000E46
-    Const MOL_PWRSPD5 = &H5000E46
-    Const MOL_PWRSPD7 = &H7000E46
-    Const MOL_ENGLSR = &H80000146
-    Const MOL_END = 0
+    Private Const MOL_MVREL = &H3026000
+    Private Const MOL_START = &H3026040
+    Private Const MOL_ORIGIN = &H346040
+    Private Const MOTION_CMD_COUNT = &H3090080
+    Private Const MOL_BEGSUB = &H1300008
+    Private Const MOL_BEGSUBa = &H1300048
+    Private Const MOL_ENDSUB = &H1400048
+    Private Const MOL_MCBLK = &H80000946
+    Private Const MOL_SETSPD = &H3000301
+    Private Const MOL_MOTION = &H3000341
+    Private Const MOL_LASER = &H1000606
+    Private Const MOL_LASER1 = &H1000646
+    Private Const MOL_LASER2 = &H1000806
+    Private Const MOL_LASER3 = &H1000846
+    Private Const MOL_GOSUB = &H1500048
+    Private Const MOL_GOSUB3 = &H3500048
+    Private Const MOL_X5_FIRST = &H200548
+    Private Const MOL_X6_LAST = &H200648
+    Private Const MOL_ACCELERATION = &H1004601
+    Private Const MOL_BLWR = &H1004A41
+    Private Const MOL_BLWRa = &H1004B41
+    Private Const MOL_SEGMENT = &H500008
+    Private Const MOL_GOSUBn = &H80500048
+    Private Const MOL_ENGPWR = &H1000746
+    Private Const MOL_ENGPWR1 = &H2000746
+    Private Const MOL_ENGSPD = &H2014341
+    Private Const MOL_ENGSPD1 = &H4010141
+    Private Const MOL_ENGACD = &H1000346
+    Private Const MOL_ENGMVY = &H2010040
+    Private Const MOL_ENGMVX = &H2014040
+    Private Const MOL_SCALE = &H3000E46
+    Private Const MOL_PWRSPD5 = &H5000E46
+    Private Const MOL_PWRSPD7 = &H7000E46
+    Private Const MOL_ENGLSR = &H80000146
+    Private Const MOL_END = 0
 
-    Const MOL_UNKNOWN07 = &H3046040      ' unknown command refered to in London Hackspace documents
-    Const MOL_UNKNOWN09 = &H326040      ' unknown command refered to in London Hackspace documents
+    Private Const MOL_UNKNOWN07 = &H3046040      ' unknown command refered to in London Hackspace documents
+    Private Const MOL_UNKNOWN09 = &H326040      ' unknown command refered to in London Hackspace documents
 
     ' Dictionary of all commands
     Private LASERcmds As New SortedDictionary(Of Integer, LASERcmd) From {
-        {MOL_MOVEREL, New LASERcmd("MOVEREL", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_MVREL, New LASERcmd("MVREL", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", GetType(Int32))},
                             {New Parameter("dx", GetType(Int32), 1 / xScale, "mm")},
                             {New Parameter("dy", GetType(Int32), 1 / yScale, "mm")}
@@ -262,7 +266,7 @@ Public Class Form1
         {MOL_BEGSUB, New LASERcmd("BEGSUB", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("n", GetType(Int32))}})},
         {MOL_BEGSUBa, New LASERcmd("BEGSUBa", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("n", GetType(Int32))}})},
         {MOL_ENDSUB, New LASERcmd("ENDSUB", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("n", GetType(Int32))}})},
-        {MOL_MCB, New LASERcmd("MCB", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Size", GetType(Int32),, "Words")}})},
+        {MOL_MCBLK, New LASERcmd("MCBLK", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Size", GetType(Int32),, "Words")}})},
         {MOL_MOTION, New LASERcmd("MOTION", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Initial speed", GetType(Double), 1 / xScale, "mm/s")},
                             {New Parameter("Max speed", GetType(Double), 1 / xScale, "mm/s")},
@@ -276,6 +280,9 @@ Public Class Form1
                             }
                            )},
         {MOL_LASER, New LASERcmd("LASER", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", GetType(OnOff_type))}})},
+        {MOL_LASER1, New LASERcmd("LASER1", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", GetType(Int32))}})},
+        {MOL_LASER2, New LASERcmd("LASER2", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", GetType(Int32))}})},
+        {MOL_LASER3, New LASERcmd("LASER3", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", GetType(Int32))}})},
         {MOL_GOSUB, New LASERcmd("GOSUB", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", GetType(Int32))}
                             }
@@ -299,8 +306,8 @@ Public Class Form1
                             }
                            )},
         {MOL_ACCELERATION, New LASERcmd("ACCELERATION", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Acceleration", GetType(Acceleration_type))}})},
-        {MOL_BLOWER, New LASERcmd("BLOWER", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", GetType(OnOff_type))}})},
-        {MOL_BLOWERa, New LASERcmd("BLOWERa", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", GetType(OnOff_type))}})},
+        {MOL_BLWR, New LASERcmd("BLWR", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", GetType(OnOff_type))}})},
+        {MOL_BLWRa, New LASERcmd("BLWRa", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", GetType(OnOff_type))}})},
         {MOL_ENGPWR, New LASERcmd("ENGPWR", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Engrave power", GetType(Integer), 0.01, "%")}})},
         {MOL_ENGPWR1, New LASERcmd("ENGPWR1", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("Engrave power", GetType(Integer), 0.01, "%")},
@@ -355,8 +362,8 @@ Public Class Form1
 
     Sub PutFloat(f As Double)
         ' write float at current offset
-        If UseMCB Then
-            MotionControlBlock.Add(Float2Leetro(f))
+        If UseMCBLK Then
+            MCBLK.Add(Float2Leetro(f))
         Else
             writer.Write(Float2Leetro(f))
         End If
@@ -364,16 +371,16 @@ Public Class Form1
 
     Sub PutInt(n As Integer)
         ' write n at current offset
-        If UseMCB Then
-            MotionControlBlock.Add(n)
+        If UseMCBLK Then
+            MCBLK.Add(n)
         Else
             writer.Write(n)
         End If
     End Sub
     Sub PutInt(n As Integer, addr As Integer)
         ' write n at specifed offset
-        If UseMCB Then
-            Throw New System.Exception($"You can't write explicitly to address {addr:x} as an MCB in in operation")
+        If UseMCBLK Then
+            Throw New System.Exception($"You can't write explicitly to address {addr:x} as an MCBLK in in operation")
         Else
             writer.BaseStream.Seek(addr, 0)     ' go to offset
             writer.Write(n)                     ' write data
@@ -460,13 +467,13 @@ Public Class Form1
             cmd_len = GetInt() And &HFF
         End If
         Select Case cmd
-            Case MOL_MCB
-                cmd_len = 1        ' allow contents of MCB to decode
+            Case MOL_MCBLK
+                cmd_len = 1        ' allow contents of MCBLK to decode
                 reader.BaseStream.Position = cmdBegin + 4     ' backup so we can read length as parameter
         End Select
 
         If LASERcmds.TryGetValue(cmd, value) Then
-            If value.ParameterType = ParameterCount.FIXED And cmd_len <> value.Parameters.Count And cmd <> MOL_MCB Then
+            If value.ParameterType = ParameterCount.FIXED And cmd_len <> value.Parameters.Count And cmd <> MOL_MCBLK Then
                 Throw New System.Exception($"Command {value.Mnemonic}: length is {cmd_len}, but data table says {value.Parameters.Count}")
             End If
             writer.Write($" {value.Mnemonic}")
@@ -531,7 +538,7 @@ Public Class Form1
         Dim command = cmd And &HFFFFFF    ' bottom 24 bits is command
         nWords = (cmd >> 24) And &HFF  ' command length is top 8 bits
         If nWords = &H80 Then nWords = GetInt() And &HFFFF
-        If cmd = MOL_MCB Then nWords = 0    ' allow contents of MCB to execute
+        If cmd = MOL_MCBLK Then nWords = 0    ' allow contents of MCBLK to execute
         Dim param_posn = stream.Position  ' remember where parameters (if any) start
 
         Select Case cmd
@@ -542,10 +549,10 @@ Public Class Form1
                     motion.Vertexes.Clear()
                 End If
                 Return 0
-            Case MOL_MCB
-                nWords = 0      ' allow MCB content to be executed
+            Case MOL_MCBLK
+                nWords = 0      ' allow MCBLK content to be executed
 
-            Case MOL_LASER      ' switch laser
+            Case MOL_LASER, MOL_LASER1     ' switch laser
                 ' Laser is changing state. Output any pending motion
                 If motion.Vertexes.Count > 0 Then
                     ' Display any motion
@@ -555,7 +562,7 @@ Public Class Form1
                 i = GetUInt()
                 Select Case i
                     Case 0 : LaserIsOn = False
-                    Case 1 : LaserIsOn = True
+                    Case 1, 2, 3 : LaserIsOn = True
                     Case Else
                         If debugflag Then TextBox1.AppendText($"Unknown LaserIsOn parameter &h{i:x8}")
                 End Select
@@ -563,15 +570,24 @@ Public Class Form1
             Case MOL_SCALE      ' also MOL_SPDPWR, MOL_SPDPWRx
                 xScale = GetFloat() : yScale = GetFloat() : GetFloat()        ' x,y,z scale command
 
-            Case MOL_MOVEREL
+            Case MOL_MVREL, MOL_START
                 Dim n = GetUInt()
                 Dim delta = New IntPoint(GetInt(), GetInt())      ' move relative command
 
                 Select Case block
                     Case BLOCK_TYPE.CONFIG
-                        STARTList.Add(delta)
+                        ' MVREL in the config block are start positions for each draw block
+                        Dim SubBlock = DrawChunks(MVRELInConfig)      ' get chunk for this draw block
+                        Dim bookmark = reader.BaseStream.Position         ' remember posn in decode stream
+                        Dim subr = GetInt(SubBlock * BLOCK_SIZE + 4)          ' get the subroutine number
+                        Dim abs = (MVRELInConfig = 0)             ' first is absolute, other are relative
+                        StartPosns.Add(subr, (abs, delta))              ' add subroutine start address
+                        reader.BaseStream.Position = bookmark                 ' restore reader position
+                        MVRELInConfig += 1
+
                     Case BLOCK_TYPE.TEST, BLOCK_TYPE.CUT
                         DXF_line(position, position + delta, Layer)     ' render on this layer ignoring laser commands
+
                     Case BLOCK_TYPE.DRAW
                         If LaserIsOn Then
                             Dim colour As AciColor
@@ -593,11 +609,6 @@ Public Class Form1
             Case MOL_START      ' indicates start position of subroutine
                 Dim n = GetUInt()
                 Dim posn = New IntPoint(GetInt(), GetInt())      ' start position
-                ' Need to add to Startposns
-                Dim NextSubr = StartPosns.Count + 1     ' number of next subroutine to add
-                Dim abs = (NextSubr = 3)
-                StartPosns.Add(NextSubr, (abs, posn))
-                STARTList.Add(posn)
 
             Case MOL_ENGACD
                 AccelLength = GetInt()
@@ -655,6 +666,7 @@ Public Class Form1
                 If n < 100 Then
                     If StartPosns.ContainsKey(n) Then
                         TextBox1.AppendText($"Starting subr {n} with position ({position.X},{position.Y}){vbCrLf}")
+                        If StartPosns(n).Absolute Then position = StartPosns(n).position Else position += StartPosns(n).position
                         Select Case n
                             Case 3
                                 block = BLOCK_TYPE.DRAW
@@ -683,9 +695,10 @@ Public Class Form1
                         motion.Layer = Layer
                         ColorIndex += 20
                 End Select
-                If n >= 3 Then
-                    If n = 3 Then position = STARTList(n - 3) Else position += STARTList(n - 3)         ' set the position for start of this subroutine
-                End If
+
+                ' Remove from ChunksWithCode as they have been executed
+                Dim chunk = addr / BLOCK_SIZE
+                ChunksWithCode(chunk) = True    ' flag as executed
 
             Case MOL_ENDSUB  ' end subroutine
                 Dim n = GetUInt()
@@ -876,12 +889,12 @@ Public Class Form1
         Dim LastBlock = CInt(writer.BaseStream.Length \ BLOCK_SIZE)       '  current length of file in blocks
         writer.BaseStream.SetLength((LastBlock + 1) * BLOCK_SIZE)       ' round up to next block
         ' Now update template values
-        FlushMCB(False)     ' just in case
+        FlushMCBLK(False)     ' just in case
         ' HEADER
         writer.BaseStream.Seek(0, SeekOrigin.Begin)
         PutInt(writer.BaseStream.Length)         ' file size
-        PutInt(MCBCount + 30)                    ' number of MCB
-        PutInt(MOVERELCnt, &H10)                 ' Count of MOVEREL, UNKNOWN07 & UNKNOWN09
+        PutInt(MCBLKCount + 30)                    ' number of MCBLK
+        PutInt(MVRELCnt, &H10)                 ' Count of MVREL, UNKNOWN07 & UNKNOWN09
         ' Bottom left
         writer.Seek(&H20, SeekOrigin.Begin)
         writer.Write(CInt(Outline.X * xScale))
@@ -909,9 +922,9 @@ Public Class Form1
         position = New IntPoint(0, 0)       ' Layer starts at (0,0)
         WriteMOL(MOL_BEGSUBa, {1}, &H400)    ' begin SUB 1
         WriteMOL(&H80600148, {6, &H25B, &H91D4000, &HF13A300, &H1113A340, &H101D7A80, &HF716C00})   ' Unknown command
-        UseMCB = True
+        UseMCBLK = True
         DrawBox(writer, dxf, outline, layer)
-        FlushMCB(False)
+        FlushMCBLK(False)
         WriteMOL(MOL_ENDSUB, {1})
         WriteMOL(MOL_END)
     End Sub
@@ -921,12 +934,12 @@ Public Class Form1
         WriteMOL(MOL_BEGSUBa, {2}, &H600)    ' begin SUB 1
         WriteMOL(&H80600148, {6, &H25B, &H91D4000, &HF13A300, &H1113A340, &H101D7A80, &HF716C00})   ' Unknown command
         WriteMOL(MOL_PWRSPD5, {4000, 4000, 629.0, 3149.0, 0.0})    ' set power & speed
-        UseMCB = True
+        UseMCBLK = True
         Dim delta = outline.BottomRight
         DXF_line(position, position + delta, CutLayer)
-        MOVERELSPLIT(outline.BottomRight, 2)  ' Move to start position in two goes
+        MVRELsplit(outline.BottomRight, 2)  ' Move to start position in two goes
         DrawBox(writer, dxf, outline, layer, False, 40, 25)
-        FlushMCB(False)
+        FlushMCBLK(False)
         WriteMOL(MOL_ENDSUB, {2})
         WriteMOL(MOL_END)
     End Sub
@@ -938,6 +951,8 @@ Public Class Form1
         PutInt(BlockNumber, &H7C)
         writer.BaseStream.Position = StartofBlock       ' position at start of block
         WriteMOL(MOL_BEGSUBa, {3}, StartofBlock)    ' begin SUB 
+        WriteMOL(&H1000D46, {&HBB8})         ' unknown command
+        WriteMOL(MOL_LASER1, {2})     ' turn laser on engrave mode?
 
         Dim cellsize = New Size(outline.Width / 10, outline.Height / 10)    ' there are 10 x 10 cells 
 
@@ -963,7 +978,7 @@ Public Class Form1
         Dim cellsize = New Size(Outline.Width / 10, Outline.Height / 10)
         PutInt(BlockNumber, &H7C + 4)
         WriteMOL(MOL_BEGSUBa, {4}, StartofBlock)    ' begin SUB
-        UseMCB = True
+        UseMCBLK = True
         DrawText(writer, dxf, My.Settings.Material, System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + (Outline.Width / 2), -5 * xScale), 5 * xScale, 0)
         DrawText(writer, dxf, $"Interval: {My.Settings.Interval} mm", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -9.5 * xScale), 5 * xScale, 0)
         DrawText(writer, dxf, $"Passes: { My.Settings.Passes}", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -14 * xScale), 5 * xScale, 0)
@@ -977,7 +992,7 @@ Public Class Form1
         DrawText(writer, dxf, "Power (%)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -95 * xScale), 10 * xScale, 0)
         DrawText(writer, dxf, "Speed (mm/s)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left - 10 * xScale, -Outline.Height / 1.3), 10 * xScale, 90)
         ' Finish block
-        FlushMCB(False)
+        FlushMCBLK(False)
         WriteMOL(MOL_ENDSUB, {4})    ' end SUB 
         WriteMOL(MOL_END)
     End Sub
@@ -987,7 +1002,7 @@ Public Class Form1
         ' Parameters are written in scaled values
         ' Parameters will be written (but not length) if present
         ' writing occurs at current writer position, or "posn" if present
-        If UseMCB And posn <> -1 Then Throw New System.Exception($"You can't write explicitly to address {posn:x} as an MCB in in operation")
+        If UseMCBLK And posn <> -1 Then Throw New System.Exception($"You can't write explicitly to address {posn:x} as an MCBLK in in operation")
 
         Dim value As LASERcmd = Nothing        ' Check the correct number of parameters
         If LASERcmds.TryGetValue(command, value) Then
@@ -1034,36 +1049,36 @@ Public Class Form1
                 End Select
             Next
         End If
-        ' Count the number of MOL_MOVEREL, MOL_UNKNOWN07 & MOL_UNKNOWN09 commands
+        ' Count the number of MOL_MVREL, MOL_UNKNOWN07 & MOL_UNKNOWN09 commands
         Select Case command
-            Case MOL_MOVEREL, MOL_UNKNOWN07, MOL_UNKNOWN09
-                MOVERELCnt += 1
+            Case MOL_MVREL, MOL_UNKNOWN07, MOL_UNKNOWN09
+                MVRELCnt += 1
         End Select
-        If MotionControlBlock.Count >= MCBMax Then
-            FlushMCB(True)      ' MCB limited in size
+        If MCBLK.Count >= MCBLKMax Then
+            FlushMCBLK(True)      ' MCBLK limited in size
         End If
     End Sub
 
-    Public Sub FlushMCB(KeepOpen As Boolean)
-        ' Flush the contents of the MotionControlBlock.
-        ' The state of UseMCB will be updated to KeepOpen when complete
-        If UseMCB Then
-            If MotionControlBlock.Count > 0 Then
-                ' Disable MCB buffering
-                UseMCB = False
-                PutInt(MOL_MCB) : PutInt(MotionControlBlock.Count)   ' write MCB command and count
-                ' Write the contents of the MCB
-                For Each item In MotionControlBlock
+    Public Sub FlushMCBLK(KeepOpen As Boolean)
+        ' Flush the contents of the MCBLK.
+        ' The state of UseMCBLK will be updated to KeepOpen when complete
+        If UseMCBLK Then
+            If MCBLK.Count > 0 Then
+                ' Disable MCBLK buffering
+                UseMCBLK = False
+                PutInt(MOL_MCBLK) : PutInt(MCBLK.Count)   ' write MCBLK command and count
+                ' Write the contents of the MCBLK
+                For Each item In MCBLK
                     PutInt(item)
                 Next
-                MotionControlBlock.Clear()          ' clear the buffer
-                MCBCount += 1                        ' count MCB
+                MCBLK.Clear()          ' clear the buffer
+                MCBLKCount += 1                        ' count MCBLK
             End If
-            UseMCB = KeepOpen       ' Turn MCB buffering back on
+            UseMCBLK = KeepOpen       ' Turn MCBLK buffering back on
         End If
     End Sub
 
-    Public Sub MOVERELSPLIT(p As IntPoint, pieces As Integer)
+    Public Sub MVRELsplit(p As IntPoint, pieces As Integer)
         ' Create a move command from the current position to p
         ' Pieces = 2 or 3
         ' Accelerate before first one
@@ -1095,7 +1110,7 @@ Public Class Form1
             Else
                 WriteMOL(MOL_SETSPD, {StartSpeed * xScale, QuickSpeed * xScale, SpaceAcc * xScale})
             End If
-            WriteMOL(MOL_MOVEREL, {772, moves(m).X, moves(m).Y})
+            WriteMOL(MOL_MVREL, {772, moves(m).X, moves(m).Y})
         Next
         position += p       ' update position
     End Sub
@@ -1126,14 +1141,14 @@ Public Class Form1
             ' MOL commands
             If delta <> ZERO Then
                 DXF_line(position, position + delta, MoveLayer)
-                MOVERELSPLIT(delta, 2)        ' Move to start of box (BottomRight) in 2 pieces
+                MVRELsplit(delta, 2)        ' Move to start of box (BottomRight) in 2 pieces
             End If
             ' Ordinary box with 4 sides
             If power > 0 Or speed > 0 Then WriteMOL(MOL_LASER, {OnOff_type._On}) : LaserIsOn = True
-            MOVERELSPLIT(New IntPoint(CInt(-outline.Width), 0), 2)
-            MOVERELSPLIT(New IntPoint(0, CInt(-outline.Height)), 2)
-            MOVERELSPLIT(New IntPoint(CInt(outline.Width), 0), 2)
-            MOVERELSPLIT(New IntPoint(0, CInt(outline.Height)), 2)
+            MVRELsplit(New IntPoint(CInt(-outline.Width), 0), 2)
+            MVRELsplit(New IntPoint(0, CInt(-outline.Height)), 2)
+            MVRELsplit(New IntPoint(CInt(outline.Width), 0), 2)
+            MVRELsplit(New IntPoint(0, CInt(outline.Height)), 2)
             If power > 0 Or speed > 0 Then WriteMOL(MOL_LASER, {OnOff_type.Off}) : LaserIsOn = False
             ' DXF commands
             ' draw 4 lines surrounding the cell
@@ -1161,7 +1176,7 @@ Public Class Form1
             ' Move to start of engraving
             delta -= New IntPoint(engacd, 0)       ' we need to backup the acceleration distance
             DXF_line(position, position + delta, MoveLayer)     ' move to start
-            MOVERELSPLIT(delta, 2)
+            MVRELsplit(delta, 2)
             Dim Steps As OnOffSteps                 ' construct steps as on for cellwidth, and off for 0
             Steps.OnSteps = CInt(outline.Width)
             Steps.OffSteps = 0
@@ -1236,7 +1251,7 @@ Public Class Form1
 
         ' draw the text
         ' DXF first
-        UseMCB = True
+        UseMCBLK = True
         ' Geometry is at the origin, so all coordinates are absolute
         For Each figure As PathFigure In Flattened.Figures
             ' if this is the first figure in SUBR 4, record in StartPosns
@@ -1264,20 +1279,20 @@ Public Class Form1
             Dim delta As IntPoint = StartPoint - position
             If delta <> ZERO Then
                 DXF_line(position, position + delta, MoveLayer)
-                MOVERELSPLIT(delta, 2)      ' move in 2 segments
+                MVRELsplit(delta, 2)      ' move in 2 segments
             End If
             WriteMOL(MOL_LASER, {OnOff_type._On})
             ' Process all vertexes, except the first
             For p = 1 To motion.Vertexes.Count - 1
                 Dim thispoint = New IntPoint(motion.Vertexes(p).Position.X, motion.Vertexes(p).Position.Y)
                 delta = thispoint - position
-                MOVERELSPLIT(delta, 2)          ' draw stroke
+                MVRELsplit(delta, 2)          ' draw stroke
             Next
             WriteMOL(MOL_LASER, {OnOff_type.Off})
 
             DXF_polyline2d(motion, TextLayer)       ' Delay output of polyline to prevent position corruption
         Next
-        FlushMCB(False)
+        FlushMCBLK(False)
     End Sub
 
     Public Shared Function EngraveParameters(speed As Double) As (Acclen As Double, AccSpace As Double, StartSpd As Double, Acc As Double, YSpeed As Double)
@@ -1639,6 +1654,16 @@ Public Class Form1
 
             ' Now execute real code
             dxf = New DxfDocument()         ' render commands in dxf
+
+            ' Create a list of all chucks known to contain code. These will be removed from the list after execution.
+            ' If there are any left, i.e. because the config code doesn't call them, they will be called
+            ChunksWithCode.Clear()
+            ChunksWithCode.Add(TestChunk, False)
+            ChunksWithCode.Add(CutChunk, False)
+            For Each s In DrawChunks
+                ChunksWithCode.Add(s, False)
+            Next
+            MVRELInConfig = 0
             Stack.Push((addr:=0, blk:=BLOCK_TYPE.TEST, lyr:=TestLayer))   ' any old rubbish to keep ENDSUB happy
             position = ZERO      ' this block has an origin of (0,0)
             ExecuteStream(BLOCK_TYPE.TEST, TestChunk * BLOCK_SIZE, dxf, TestLayer)   ' test
@@ -1651,15 +1676,24 @@ Public Class Form1
             position = ZERO      ' this block has an origin of (0,0)
             ExecuteStream(BLOCK_TYPE.CONFIG, ConfigChunk * BLOCK_SIZE, dxf, ConfigLayer)   ' config (which calls everything else)
 
+            ' Now execute any that weren't called from config
+            For Each s In ChunksWithCode
+                If Not s.Value Then
+                    Stack.Push((addr:=0, blk:=BLOCK_TYPE.DRAW, lyr:=DrawLayer))   ' any old rubbish to keep ENDSUB happy
+                    position = ZERO      ' this block has an origin of (0,0)
+                    ExecuteStream(BLOCK_TYPE.DRAW, s.Key * BLOCK_SIZE, dxf, DrawLayer)   ' config (which calls everything else)
+                End If
+            Next
+
             ' Add the filename at the bottom of the image
             Dim BaseDXF = System.IO.Path.GetFileNameWithoutExtension(dlg.filename)
             Dim DXFfile = $"{BaseDXF}_MOL.dxf"
             Dim rect = New System.Windows.Rect(TopRight, BottomLeft)    ' bounding rectangle
             rect.Scale(1 / xScale, 1 / yScale)                      ' convert to mm
             entity = New Text($"File: {DXFfile}") With {
-                .position = New Vector3(rect.X + rect.Width / 2, rect.Y - rect.Height / 10, 0),
+                .Position = New Vector3(rect.X + rect.Width / 2, rect.Y - rect.Height / 10, 0),
                 .Alignment = Entities.TextAlignment.TopCenter,
-                .layer = TextLayer,
+                .Layer = TextLayer,
                 .Height = Math.Max(rect.Width, rect.Height) / 20
                 }
             dxf.Entities.Add(entity)
@@ -1687,8 +1721,6 @@ Public Class Form1
         ' Initialise all variables
         ' Setup some start positions
         StartPosns.Clear()
-        STARTList.Clear()
-
         DrawChunks.Clear()
         ' Create initial start positions
         SubrAddrs.Clear()
@@ -1696,6 +1728,7 @@ Public Class Form1
         StartPosns.Add(1, (True, New IntPoint(0, 0)))
         StartPosns.Add(2, (True, New IntPoint(0, 0)))
         position = ZERO
+        ChunksWithCode.Clear()
 
         TextBox1.Clear()
 
