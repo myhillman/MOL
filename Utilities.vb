@@ -50,9 +50,11 @@ Module Utilities
         'Return AciColor.FromHsl(30 / 360, 0.6, CSng(power / 100) * (1 - (CSng(speed) / My.Settings.SpeedMax)))
         If power > My.Settings.PowerMax Then Throw New System.Exception($"{power} is greater than maximum {My.Settings.PowerMax}")
         If speed > My.Settings.SpeedMax Then Throw New System.Exception($"{speed} is greater than maximum {My.Settings.SpeedMax}")
-        Dim pwr = (power - My.Settings.PowerMin) / (My.Settings.PowerMax - My.Settings.PowerMin)
-        Dim spd = 1 - ((speed - My.Settings.SpeedMin) / (My.Settings.SpeedMax - My.Settings.SpeedMin))
-        Return AciColor.FromHsl(0, 0, pwr * spd)
+        Dim pwr = 1 - (power / My.Settings.PowerMax)
+        Dim spd = speed / My.Settings.SpeedMax
+        Dim lum = pwr * spd
+        ' Vary the luminance of HSL color. For White, L=1, for Black L=0
+        Return AciColor.FromHsl(0, 0, lum)
     End Function
 
     Function Distance(p1 As Vector2, p2 As Vector2) As Single

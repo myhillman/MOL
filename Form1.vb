@@ -266,13 +266,13 @@ Public Class Form1
         {MOL_MOTION, New LASERcmd("MOTION", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Initial speed", GetType(Double), 1 / xScale, "mm/s")},
                             {New Parameter("Max speed", GetType(Double), 1 / xScale, "mm/s")},
-                            {New Parameter("Acceleration", GetType(Double), 1 / xScale, "mm/s2")}
+                            {New Parameter("Acceleration", GetType(Double), 1 / xScale, "mm/s²")}
                             }
                            )},
         {MOL_SETSPD, New LASERcmd("SETSPD", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Initial speed", GetType(Double), 1 / xScale, "m/s")},
                             {New Parameter("Max speed", GetType(Double), 1 / xScale, "m/s")},
-                            {New Parameter("Acceleration", GetType(Double), 1 / xScale, "m/s2")}
+                            {New Parameter("Acceleration", GetType(Double), 1 / xScale, "m/s²")}
                             }
                            )},
         {MOL_LASER, New LASERcmd("LASER", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", GetType(OnOff_type))}})},
@@ -308,12 +308,12 @@ Public Class Form1
                 }
               )},
         {MOL_ENGSPD, New LASERcmd("ENGSPD", ParameterCount.FIXED, New List(Of Parameter) From {
-                {New Parameter("Axis", GetType(Integer))},
+                {New Parameter("Axis", GetType(Axis_type))},
                 {New Parameter("Speed", GetType(Double), 1 / xScale, "mm/s")}
                 }
               )},
         {MOL_ENGSPD1, New LASERcmd("ENGSPD1", ParameterCount.FIXED, New List(Of Parameter) From {
-                {New Parameter("Axis", GetType(Integer))},
+                {New Parameter("Axis", GetType(Axis_type))},
                 {New Parameter("??", GetType(Double))},
                 {New Parameter("Speed", GetType(Double), 1 / xScale, "mm/s")},
                 {New Parameter("??", GetType(Double))}
@@ -654,12 +654,7 @@ Public Class Form1
                 CurrentSubr = n
                 If n < 100 Then
                     If StartPosns.ContainsKey(n) Then
-                        If StartPosns(n).Absolute Then
-                            position = StartPosns(n).position
-                        Else
-                            position += StartPosns(n).position
-                        End If
-                        TextBox1.AppendText($"Starting subr {n} with position ({position.X:f2},{position.Y:f2}){vbCrLf}")
+                        TextBox1.AppendText($"Starting subr {n} with position ({position.X},{position.Y}){vbCrLf}")
                         Select Case n
                             Case 3
                                 block = BLOCK_TYPE.DRAW
@@ -993,27 +988,28 @@ Public Class Form1
         ' Parameters will be written (but not length) if present
         ' writing occurs at current writer position, or "posn" if present
         If UseMCB And posn <> -1 Then Throw New System.Exception($"You can't write explicitly to address {posn:x} as an MCB in in operation")
-        ' Check the correct number of parameters
-        If LASERcmds.ContainsKey(command) Then
+
+        Dim value As LASERcmd = Nothing        ' Check the correct number of parameters
+        If LASERcmds.TryGetValue(command, value) Then
             ' It is a known command, therefore do some checks
-            Dim nWords = LASERcmds(command).Parameters.Count
+            Dim nWords = value.Parameters.Count
             If Parameters Is Nothing Then
                 If nWords <> 0 Then
-                    Throw New System.Exception($"WRITEMOL {LASERcmds(command).Mnemonic}: parameter error. Parameter is Nothing, yet command requires {nWords}")
+                    Throw New System.Exception($"WRITEMOL {value.Mnemonic}: parameter error. Parameter is Nothing, yet command requires {nWords}")
                 End If
             Else
-                If LASERcmds(command).ParameterType = ParameterCount.FIXED And Parameters.Length <> nWords Then
-                    Throw New System.Exception($"{LASERcmds(command).Mnemonic}: parameter error. There are {Parameters.Length} parameters, yet command requires {nWords}")
+                If value.ParameterType = ParameterCount.FIXED And Parameters.Length <> nWords Then
+                    Throw New System.Exception($"{value.Mnemonic}: parameter error. There are {Parameters.Length} parameters, yet command requires {nWords}")
                 End If
             End If
 
             ' Check correct type of parameters
-            If nWords > 0 And LASERcmds(command).ParameterType = ParameterCount.FIXED Then
+            If nWords > 0 And value.ParameterType = ParameterCount.FIXED Then
                 For i = 0 To nWords - 1
-                    Dim a = LASERcmds(command).Parameters(i).Typ
+                    Dim a = value.Parameters(i).Typ
                     Dim b = Parameters(i).GetType
                     If a <> b Then
-                        Throw New System.Exception($"{LASERcmds(command).Mnemonic}: parameter {LASERcmds(command).Parameters(i).Name}: type mismatch - spec is {a}, call is {b}")
+                        Throw New System.Exception($"{value.Mnemonic}: parameter {value.Parameters(i).Name}: type mismatch - spec is {a}, call is {b}")
                     End If
                 Next
             End If
@@ -1171,7 +1167,7 @@ Public Class Form1
             Steps.OffSteps = 0
             WriteMOL(MOL_ENGACD, {engacd})     ' define the acceleration start distance
             WriteMOL(MOL_ENGPWR, {power * 100})             ' define power
-            WriteMOL(MOL_ENGSPD, {4, speed * xScale})          ' define speed
+            WriteMOL(MOL_ENGSPD, {Axis_type.X, speed * xScale})          ' define speed
             Dim OnOffTotal As Integer = engacd * 2 + Steps.OnSteps + Steps.OffSteps
             Dim OnOffOnly As Integer = Steps.OnSteps + Steps.OffSteps   ' only on/off step distance
             Dim direction As Integer = 1        ' moving L to R
@@ -1247,7 +1243,7 @@ Public Class Form1
             Dim StartPoint As New IntPoint(figure.StartPoint.X, figure.StartPoint.Y)
             If Not StartPosns.ContainsKey(4) Then
                 Dim offset As IntPoint = StartPoint - position
-                TextBox1.AppendText($"Setting subr 4 offset to ({offset.X:f2},{offset.Y:f2}){vbCrLf}")
+                TextBox1.AppendText($"Setting subr 4 offset to ({CInt(offset.X)},{CInt(offset.Y)}){vbCrLf}")
                 StartPosns.Add(4, (False, offset))            ' start offset for this subroutine
                 position = StartPoint     ' position will be StartPoint when subr executes
             End If
