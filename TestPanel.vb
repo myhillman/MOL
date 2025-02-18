@@ -1,8 +1,7 @@
 ﻿Imports System.ComponentModel
-Imports System.Windows.Forms
 
 Public Class TestPanel
-    Dim material As String, interval As Single, passes As Integer, speedMin As Integer, speedMax As Integer, powerMin As Integer, powerMax As Integer
+    Private material As String, interval As Single, passes As Integer, speedMin As Integer, speedMax As Integer, powerMin As Integer, powerMax As Integer
     Private Sub OK_Button_Click(ByVal sender As System.Object, ByVal e As EventArgs) Handles OK_Button.Click
         Me.DialogResult = System.Windows.Forms.DialogResult.OK
         ' All parameters are validated. Save them

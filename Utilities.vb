@@ -2,12 +2,13 @@
 Imports netDxf
 
 ' Miscellaneous SHARED routines that don't belong in a class
-Module Utilities
+Friend Module Utilities
     ' Create a union so that a float can be accessed as a UInt
     <StructLayout(LayoutKind.Explicit)> Public Structure IntFloatUnion
         <FieldOffset(0)>
         Public i As Integer
-        <FieldOffset(0)> Dim f As Single
+        <FieldOffset(0)>
+        Public f As Single
     End Structure
 
     Public ScaleUnity = New Matrix3(1, 0, 0, 0, 1, 0, 0, 0, 1)             ' scale factor of 1
@@ -26,7 +27,7 @@ Module Utilities
         Return ieee.f   ' return floating point
     End Function
 
-    Function Float2Leetro(f As Single) As Integer
+    Public Function Float2Leetro(f As Single) As Integer
         ' Convert integer to Leetro float
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
         ' IEEE float format    [seeeeeee|emmmmmmm|mmmmmmmm|mmmmmmmm]
@@ -45,6 +46,21 @@ Module Utilities
         Return ieee.i
     End Function
 
+    Public Function EngraveParameters(speed As Double) As (Acclen As Double, AccSpace As Double, StartSpd As Double, Acc As Double, YSpeed As Double)
+        ' For a given speed, return dependant cutter parameters
+        Select Case speed
+            Case 0 To 150 : Return (12.0, 0, 60.0, 7000.0, 30.0)
+            Case 150 To 250 : Return (14.0, -0.8, 60.0, 7000.0, 30.0)
+            Case 250 To 350 : Return (16.0, -0.12, 60.0, 7000.0, 30.0)
+            Case 350 To 450 : Return (18.0, -0.25, 60.0, 7000.0, 30.0)
+            Case 450 To 550 : Return (20.0, -0.35, 60.0, 7000.0, 30.0)
+            Case 550 To 650 : Return (24.0, -0.45, 60.0, 7000.0, 30.0)
+            Case 650 To 750 : Return (28.0, -0.55, 60.0, 7000.0, 30.0)
+            Case 750 To 1200 : Return (30.0, -0.65, 60.0, 7000.0, 30.0)
+            Case Else
+                Throw New System.Exception($"Cannot provide engrave parameters for speed of {speed}")
+        End Select
+    End Function
     Public Function PowerSpeedColor(power As Single, speed As Single) As AciColor
         ' Convert speed/power to an approximate color
         'Return AciColor.FromHsl(30 / 360, 0.6, CSng(power / 100) * (1 - (CSng(speed) / My.Settings.SpeedMax)))
@@ -57,9 +73,36 @@ Module Utilities
         Return AciColor.FromHsl(0, 0, lum)
     End Function
 
-    Function Distance(p1 As Vector2, p2 As Vector2) As Single
+    Public Function Distance(p1 As IntPoint, p2 As IntPoint) As Single
         ' Calculate the distance between two points
         Return Math.Sqrt((p1.X - p2.X) ^ 2 + (p1.Y - p2.Y) ^ 2)
+    End Function
+    Public Function Distance(p1 As Vector2, p2 As Vector2) As Single
+        ' Calculate the distance between two points
+        Return Math.Sqrt((p1.X - p2.X) ^ 2 + (p1.Y - p2.Y) ^ 2)
+    End Function
+
+    Public Function SolveQuadratic(s As Double, u As Double, a As Double) As (Double, Double)
+        ' Coefficients for the quadratic equation
+        ' Solve s = ut + 0.5 a * t^2
+        Dim AA As Double = 0.5 * a
+        Dim B As Double = u
+        Dim C As Double = -s
+
+        ' Calculate the discriminant
+        Dim discriminant As Double = B * B - 4 * AA * C
+
+        ' Check if the discriminant is negative, zero, or positive
+        If discriminant < 0 Then
+            Throw New ArgumentException("No real solutions exist.")
+        End If
+
+        ' Calculate the two solutions using the quadratic formula
+        Dim t1 As Double = (-B + Math.Sqrt(discriminant)) / (2 * AA)
+        Dim t2 As Double = (-B - Math.Sqrt(discriminant)) / (2 * AA)
+
+        ' Return the solutions as a tuple
+        Return (t1, t2)
     End Function
 
 End Module

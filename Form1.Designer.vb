@@ -41,12 +41,13 @@ Partial Class Form1
         WordAccessToolStripMenuItem = New ToolStripMenuItem()
         TestIEEEToLeetroFpConversionToolStripMenuItem = New ToolStripMenuItem()
         TextTestToolStripMenuItem = New ToolStripMenuItem()
-        TextBox1 = New TextBox()
-        ProgressBar1 = New ProgressBar()
         LineTestToolStripMenuItem = New ToolStripMenuItem()
         BoxTestToolStripMenuItem = New ToolStripMenuItem()
         SHXTestToolStripMenuItem = New ToolStripMenuItem()
         ConvertLeetroToIEEEToolStripMenuItem = New ToolStripMenuItem()
+        CreateYAMLFileToolStripMenuItem = New ToolStripMenuItem()
+        TextBox1 = New TextBox()
+        ProgressBar1 = New ProgressBar()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
@@ -61,7 +62,7 @@ Partial Class Form1
         ' 
         ' OpenToolStripMenuItem
         ' 
-        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {DisassembleToolStripMenuItem, RenderToolStripMenuItem, TestCardParametersToolStripMenuItem, MakeTestCardToolStripMenuItem, DXFMetricsToolStripMenuItem, ReconstructMINIMARIOMOLToolStripMenuItem, CommandSummaryToolStripMenuItem, ExitToolStripMenuItem})
+        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {DisassembleToolStripMenuItem, RenderToolStripMenuItem, MakeTestCardToolStripMenuItem, TestCardParametersToolStripMenuItem, DXFMetricsToolStripMenuItem, ReconstructMINIMARIOMOLToolStripMenuItem, CommandSummaryToolStripMenuItem, ExitToolStripMenuItem})
         OpenToolStripMenuItem.Name = "OpenToolStripMenuItem"
         OpenToolStripMenuItem.Size = New Size(37, 20)
         OpenToolStripMenuItem.Text = "File"
@@ -124,30 +125,30 @@ Partial Class Form1
         ' HEXDUMPONToolStripMenuItem
         ' 
         HEXDUMPONToolStripMenuItem.Name = "HEXDUMPONToolStripMenuItem"
-        HEXDUMPONToolStripMenuItem.Size = New Size(180, 22)
+        HEXDUMPONToolStripMenuItem.Size = New Size(154, 22)
         HEXDUMPONToolStripMenuItem.Text = "HEXDUMP ON"
         ' 
         ' HEXDUMPOFFToolStripMenuItem
         ' 
         HEXDUMPOFFToolStripMenuItem.Name = "HEXDUMPOFFToolStripMenuItem"
-        HEXDUMPOFFToolStripMenuItem.Size = New Size(180, 22)
+        HEXDUMPOFFToolStripMenuItem.Size = New Size(154, 22)
         HEXDUMPOFFToolStripMenuItem.Text = "HEXDUMP OFF"
         ' 
         ' DEBUGONToolStripMenuItem
         ' 
         DEBUGONToolStripMenuItem.Name = "DEBUGONToolStripMenuItem"
-        DEBUGONToolStripMenuItem.Size = New Size(180, 22)
+        DEBUGONToolStripMenuItem.Size = New Size(154, 22)
         DEBUGONToolStripMenuItem.Text = "DEBUG ON"
         ' 
         ' DEBUGOFFToolStripMenuItem
         ' 
         DEBUGOFFToolStripMenuItem.Name = "DEBUGOFFToolStripMenuItem"
-        DEBUGOFFToolStripMenuItem.Size = New Size(180, 22)
+        DEBUGOFFToolStripMenuItem.Size = New Size(154, 22)
         DEBUGOFFToolStripMenuItem.Text = "DEBUG OFF"
         ' 
         ' TestToolStripMenuItem
         ' 
-        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, SHXTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem})
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, SHXTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, CreateYAMLFileToolStripMenuItem})
         TestToolStripMenuItem.Name = "TestToolStripMenuItem"
         TestToolStripMenuItem.Size = New Size(40, 20)
         TestToolStripMenuItem.Text = "Test"
@@ -169,24 +170,6 @@ Partial Class Form1
         TextTestToolStripMenuItem.Name = "TextTestToolStripMenuItem"
         TextTestToolStripMenuItem.Size = New Size(244, 22)
         TextTestToolStripMenuItem.Text = "Text test"
-        ' 
-        ' TextBox1
-        ' 
-        TextBox1.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        TextBox1.Location = New Point(12, 31)
-        TextBox1.Multiline = True
-        TextBox1.Name = "TextBox1"
-        TextBox1.ScrollBars = ScrollBars.Both
-        TextBox1.Size = New Size(1023, 554)
-        TextBox1.TabIndex = 1
-        ' 
-        ' ProgressBar1
-        ' 
-        ProgressBar1.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        ProgressBar1.Location = New Point(12, 591)
-        ProgressBar1.Name = "ProgressBar1"
-        ProgressBar1.Size = New Size(1023, 21)
-        ProgressBar1.TabIndex = 2
         ' 
         ' LineTestToolStripMenuItem
         ' 
@@ -211,6 +194,30 @@ Partial Class Form1
         ConvertLeetroToIEEEToolStripMenuItem.Name = "ConvertLeetroToIEEEToolStripMenuItem"
         ConvertLeetroToIEEEToolStripMenuItem.Size = New Size(244, 22)
         ConvertLeetroToIEEEToolStripMenuItem.Text = "Convert Leetro to IEEE"
+        ' 
+        ' CreateYAMLFileToolStripMenuItem
+        ' 
+        CreateYAMLFileToolStripMenuItem.Name = "CreateYAMLFileToolStripMenuItem"
+        CreateYAMLFileToolStripMenuItem.Size = New Size(244, 22)
+        CreateYAMLFileToolStripMenuItem.Text = "Create YAML file"
+        ' 
+        ' TextBox1
+        ' 
+        TextBox1.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        TextBox1.Location = New Point(12, 31)
+        TextBox1.Multiline = True
+        TextBox1.Name = "TextBox1"
+        TextBox1.ScrollBars = ScrollBars.Both
+        TextBox1.Size = New Size(1023, 554)
+        TextBox1.TabIndex = 1
+        ' 
+        ' ProgressBar1
+        ' 
+        ProgressBar1.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        ProgressBar1.Location = New Point(12, 591)
+        ProgressBar1.Name = "ProgressBar1"
+        ProgressBar1.Size = New Size(1023, 21)
+        ProgressBar1.TabIndex = 2
         ' 
         ' Form1
         ' 
@@ -255,5 +262,6 @@ Partial Class Form1
     Friend WithEvents BoxTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents SHXTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ConvertLeetroToIEEEToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents CreateYAMLFileToolStripMenuItem As ToolStripMenuItem
 
 End Class
