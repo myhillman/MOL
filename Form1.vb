@@ -946,7 +946,7 @@ Public Class Form1
         PutInt(MOL_END)
 
         writer.Close()
-        TextBox1.AppendText("Done - output in {filename}")
+        TextBox1.AppendText($"Done - output in {filename}")
     End Sub
 
     Public Sub MakeTestBlock(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, layer As Layer)
@@ -1177,17 +1177,19 @@ Public Class Form1
         TextBox1.AppendText($"Drawing box at ({CInt(outline.X)},{CInt(outline.Y)}) width {CInt(outline.Width)} height {CInt(outline.Height)} power {power} speed {speed} engraved {shaded}{vbCrLf}")
         My.Application.DoEvents()
         Dim motion As New Polyline2D With {.Layer = Layer}
-        If Layer.Equals(EngraveLayer) Then
-            If Not StartPosns.ContainsKey(3) Then
-                position = outline.BottomRight      ' is converted to steps
-                StartPosns.Add(3, (True, position))     ' this is the first point in SUBR 3 add a starting position
-            End If
-        End If
+
         Dim shading As AciColor = PowerSpeedColor(power, speed)     ' color to represent engrave shade
         If Layer.Equals(EngraveLayer) Or Layer.Equals(TextLayer) Then
             Layer.Color = shading
         End If
         If Not shaded Then
+            ' start position is "top right"
+            If Layer.Equals(EngraveLayer) Then
+                If Not StartPosns.ContainsKey(3) Then
+                    position = outline.BottomRight      ' is converted to steps
+                    StartPosns.Add(3, (True, position))     ' this is the first point in SUBR 3 add a starting position
+                End If
+            End If
             ' If we are not at the start position, move to start
             Dim delta As IntPoint = CType(outline.BottomRight, IntPoint) - position    ' really top right
             ' MOL commands
@@ -1216,7 +1218,7 @@ Public Class Form1
                 .Add(New Polyline2DVertex(x1, y2))
                 .Add(New Polyline2DVertex(x1, y1))
             End With
-            DXF_polyline2d(motion, Layer, 1 / xScale)
+            DXF_polyline2d(motion, Layer)
         Else
             ' Engraved box
             ' Create equivalent MOL & DXF in parallel
@@ -1227,10 +1229,19 @@ Public Class Form1
             Layer.Color = shading
             Dim EngParameters = EngraveParameters(speed)
             Dim engacd = CInt(EngParameters.Acclen * xScale)     ' Acceleration distance in steps
+            Dim deltaacd = New IntPoint(engacd, 0)       ' we need to backup the acceleration distance
+            ' start position is "bottom left" - ACD
+            If Layer.Equals(EngraveLayer) Then
+                If Not StartPosns.ContainsKey(3) Then
+                    position = outline.TopLeft      ' is converted to steps
+                    position -= deltaacd
+                    StartPosns.Add(3, (True, position))     ' this is the first point in SUBR 3 add a starting position
+                End If
+            End If
             ' get to start position. First get to bottom left of box, and then backup the acceleration distance
             Dim delta As IntPoint = CType(outline.TopLeft, IntPoint) - position     ' really bottom left
+            delta -= deltaacd
             ' Move to start of engraving
-            delta -= New IntPoint(engacd, 0)       ' we need to backup the acceleration distance
             DXF_line(position, position + delta, MoveLayer)     ' move to start
             MoveRelativeSplit(delta)
             WriteMOL(MOL_LASER1, {2})     ' turn laser on engrave mode?
@@ -1348,7 +1359,7 @@ Public Class Form1
             Next
             WriteMOL(MOL_LASER, {OnOff_type.Off})
 
-            DXF_polyline2d(motion, TextLayer)       ' Delay output of polyline to prevent position corruption
+            DXF_polyline2d(motion, TextLayer, 1 / xScale)       ' Delay output of polyline to prevent position corruption
         Next
         FlushMCBLK(False)
     End Sub
