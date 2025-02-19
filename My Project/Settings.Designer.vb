@@ -149,6 +149,30 @@ Namespace My
                 Me("PowerMax") = value
             End Set
         End Property
+        
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("")>  _
+        Public Property FontPath() As String
+            Get
+                Return CType(Me("FontPath"),String)
+            End Get
+            Set
+                Me("FontPath") = value
+            End Set
+        End Property
+        
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("")>  _
+        Public Property FontFile() As String
+            Get
+                Return CType(Me("FontFile"),String)
+            End Get
+            Set
+                Me("FontFile") = value
+            End Set
+        End Property
     End Class
 End Namespace
 

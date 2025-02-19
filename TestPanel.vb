@@ -1,18 +1,22 @@
 ﻿Imports System.ComponentModel
+Imports System.IO
+Imports System.Windows.Controls
 
 Public Class TestPanel
     Private material As String, interval As Single, passes As Integer, speedMin As Integer, speedMax As Integer, powerMin As Integer, powerMax As Integer
     Private Sub OK_Button_Click(ByVal sender As System.Object, ByVal e As EventArgs) Handles OK_Button.Click
         Me.DialogResult = System.Windows.Forms.DialogResult.OK
         ' All parameters are validated. Save them
-        My.Settings.Material = Me.tbMaterial.Text
-        My.Settings.Interval = Me.tbInterval.Text
-        My.Settings.Passes = Me.tbPasses.Text
-        My.Settings.SpeedMin = Me.tbSpeedMin.Text
-        My.Settings.SpeedMax = Me.tbSpeedMax.Text
-        My.Settings.PowerMin = CSng(Me.tbPowerMin.Text)
-        My.Settings.PowerMax = CSng(Me.tbPowerMax.Text)
-        My.Settings.Engrave = Me.CheckBox1.Checked
+        My.Settings.Material = tbMaterial.Text
+        My.Settings.Interval = tbInterval.Text
+        My.Settings.Passes = tbPasses.Text
+        My.Settings.SpeedMin = tbSpeedMin.Text
+        My.Settings.SpeedMax = tbSpeedMax.Text
+        My.Settings.PowerMin = CSng(tbPowerMin.Text)
+        My.Settings.PowerMax = CSng(tbPowerMax.Text)
+        My.Settings.Engrave = CheckBox1.Checked
+        My.Settings.FontPath = tbFontPath.Text
+        My.Settings.FontFile = cbFontFile.Text
         My.Settings.Save()
         Me.Close()
     End Sub
@@ -33,6 +37,13 @@ Public Class TestPanel
             .tbPowerMin.Text = My.Settings.PowerMin
             .tbPowerMax.Text = My.Settings.PowerMax
             .CheckBox1.Checked = My.Settings.Engrave
+            .tbFontPath.Text = My.Settings.FontPath
+            ' Fill the list box
+            For Each foundFile As String In My.Computer.FileSystem.GetFiles(My.Settings.FontPath, FileIO.SearchOption.SearchTopLevelOnly, "*.lff")
+                Dim filename = Path.GetFileName(foundFile)
+                cbFontFile.Items.Add(filename)
+            Next
+            .cbFontFile.SelectedIndex = cbFontFile.FindStringExact(My.Settings.FontFile)  ' select the current font file
         End With
     End Sub
     Private Sub tbMaterial_Validating(sender As Object, e As CancelEventArgs) Handles tbMaterial.Validating
@@ -153,5 +164,12 @@ Public Class TestPanel
         ErrorProvider1.SetError(sender, "")     ' remove error message (if any)
     End Sub
 
+    Private Sub btnFontFolder_Click(sender As Object, e As EventArgs) Handles btnFontFolder.Click
 
+        If FolderBrowserDialog1.ShowDialog() = vbOK Then
+            ' User has selected path
+            My.Settings.FontPath = FolderBrowserDialog1.SelectedPath
+        End If
+
+    End Sub
 End Class

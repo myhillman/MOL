@@ -26,5 +26,11 @@
     <Setting Name="PowerMax" Type="System.Single" Scope="User">
       <Value Profile="(Default)">80</Value>
     </Setting>
+    <Setting Name="FontPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="FontFile" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
   </Settings>
 </SettingsFile>

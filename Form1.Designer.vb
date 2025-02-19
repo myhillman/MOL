@@ -26,8 +26,8 @@ Partial Class Form1
         OpenToolStripMenuItem = New ToolStripMenuItem()
         DisassembleToolStripMenuItem = New ToolStripMenuItem()
         RenderToolStripMenuItem = New ToolStripMenuItem()
-        TestCardParametersToolStripMenuItem = New ToolStripMenuItem()
         MakeTestCardToolStripMenuItem = New ToolStripMenuItem()
+        TestCardParametersToolStripMenuItem = New ToolStripMenuItem()
         DXFMetricsToolStripMenuItem = New ToolStripMenuItem()
         ReconstructMINIMARIOMOLToolStripMenuItem = New ToolStripMenuItem()
         CommandSummaryToolStripMenuItem = New ToolStripMenuItem()
@@ -43,11 +43,11 @@ Partial Class Form1
         TextTestToolStripMenuItem = New ToolStripMenuItem()
         LineTestToolStripMenuItem = New ToolStripMenuItem()
         BoxTestToolStripMenuItem = New ToolStripMenuItem()
-        SHXTestToolStripMenuItem = New ToolStripMenuItem()
         ConvertLeetroToIEEEToolStripMenuItem = New ToolStripMenuItem()
         CreateYAMLFileToolStripMenuItem = New ToolStripMenuItem()
         TextBox1 = New TextBox()
         ProgressBar1 = New ProgressBar()
+        FontTestToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
@@ -79,17 +79,17 @@ Partial Class Form1
         RenderToolStripMenuItem.Size = New Size(233, 22)
         RenderToolStripMenuItem.Text = "Render"
         ' 
-        ' TestCardParametersToolStripMenuItem
-        ' 
-        TestCardParametersToolStripMenuItem.Name = "TestCardParametersToolStripMenuItem"
-        TestCardParametersToolStripMenuItem.Size = New Size(233, 22)
-        TestCardParametersToolStripMenuItem.Text = "Test card parameters"
-        ' 
         ' MakeTestCardToolStripMenuItem
         ' 
         MakeTestCardToolStripMenuItem.Name = "MakeTestCardToolStripMenuItem"
         MakeTestCardToolStripMenuItem.Size = New Size(233, 22)
         MakeTestCardToolStripMenuItem.Text = "Make Test card"
+        ' 
+        ' TestCardParametersToolStripMenuItem
+        ' 
+        TestCardParametersToolStripMenuItem.Name = "TestCardParametersToolStripMenuItem"
+        TestCardParametersToolStripMenuItem.Size = New Size(233, 22)
+        TestCardParametersToolStripMenuItem.Text = "Test card parameters"
         ' 
         ' DXFMetricsToolStripMenuItem
         ' 
@@ -148,7 +148,7 @@ Partial Class Form1
         ' 
         ' TestToolStripMenuItem
         ' 
-        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, SHXTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, CreateYAMLFileToolStripMenuItem})
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, CreateYAMLFileToolStripMenuItem, FontTestToolStripMenuItem})
         TestToolStripMenuItem.Name = "TestToolStripMenuItem"
         TestToolStripMenuItem.Size = New Size(40, 20)
         TestToolStripMenuItem.Text = "Test"
@@ -183,12 +183,6 @@ Partial Class Form1
         BoxTestToolStripMenuItem.Size = New Size(244, 22)
         BoxTestToolStripMenuItem.Text = "Box test"
         ' 
-        ' SHXTestToolStripMenuItem
-        ' 
-        SHXTestToolStripMenuItem.Name = "SHXTestToolStripMenuItem"
-        SHXTestToolStripMenuItem.Size = New Size(244, 22)
-        SHXTestToolStripMenuItem.Text = "SHX test"
-        ' 
         ' ConvertLeetroToIEEEToolStripMenuItem
         ' 
         ConvertLeetroToIEEEToolStripMenuItem.Name = "ConvertLeetroToIEEEToolStripMenuItem"
@@ -218,6 +212,12 @@ Partial Class Form1
         ProgressBar1.Name = "ProgressBar1"
         ProgressBar1.Size = New Size(1023, 21)
         ProgressBar1.TabIndex = 2
+        ' 
+        ' FontTestToolStripMenuItem
+        ' 
+        FontTestToolStripMenuItem.Name = "FontTestToolStripMenuItem"
+        FontTestToolStripMenuItem.Size = New Size(244, 22)
+        FontTestToolStripMenuItem.Text = "Font test"
         ' 
         ' Form1
         ' 
@@ -260,8 +260,8 @@ Partial Class Form1
     Friend WithEvents RenderToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents LineTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents BoxTestToolStripMenuItem As ToolStripMenuItem
-    Friend WithEvents SHXTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ConvertLeetroToIEEEToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents CreateYAMLFileToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents FontTestToolStripMenuItem As ToolStripMenuItem
 
 End Class

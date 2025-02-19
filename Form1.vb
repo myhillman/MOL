@@ -10,6 +10,12 @@ Imports netDxf.Entities
 Imports netDxf.Tables
 Imports Windows.Win32.System
 Imports YamlDotNet.Serialization
+Imports System.Text.RegularExpressions
+Imports System.Windows.Forms.Design.AxImporter
+Imports System.Text
+Imports MOL.Form1
+Imports System.DirectoryServices.ActiveDirectory
+Imports System.Text.Unicode
 
 ' Define the different block types
 Public Enum BLOCKTYPE
@@ -79,6 +85,7 @@ Public Class Form1
     Private MVRELCnt As Integer = 0                    ' Count of MVREL + &h264 + &h284
     Private Const MCBLKMax = 508                           ' maximum words in a MCBLK
     Private ChunksWithCode As New Dictionary(Of Integer, Boolean)      ' list of chunks known to contain code. Boolean is true if has been executed
+    Private FontData As New Dictionary(Of Integer, Glyph)       ' stroke fonts
 
 
     ' Variables that reflect the state of the laser cutter
@@ -1136,16 +1143,20 @@ Public Class Form1
 
         If S > Dist / 2 Then
             ' we can get more than halfway if we needed, so 2 pieces enough
-            moves.Add(New IntPoint(p.X / 2, p.Y / 2))
-            moves.Add(New IntPoint(p.X / 2, p.Y / 2))
+            ' We do it this way to avoid rounding errors
+            Dim delta1 = New IntPoint(p.X / 2, p.Y / 2)
+            moves.Add(delta1)
+            Dim delta2 = p - delta1
+            moves.Add(delta2)
         Else
             ' we can't make it halfway whilst accelerating, so will need to coast
             Dim ratio = S / Dist        ' percentage of accelerate/decelerate phases
             Dim delta1 = New IntPoint(p.X * ratio, p.Y * ratio)
             Dim delta2 = New IntPoint(p.X * (1 - 2 * ratio), p.Y * (1 - 2 * ratio))
+            Dim delta3 = p - delta1 - delta2
             moves.Add(delta1)       ' initial move
             moves.Add(delta2)       ' middle move
-            moves.Add(delta1)       ' final move
+            moves.Add(delta3)       ' final move
         End If
 
         For m = 0 To moves.Count - 1
@@ -1802,7 +1813,7 @@ Public Class Form1
         dxf.Save("LineTest.dxf")
     End Sub
 
-    Private Sub SHXTestToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SHXTestToolStripMenuItem.Click
+    Private Sub SHXTestToolStripMenuItem_Click(sender As Object, e As EventArgs)
 
 
     End Sub
@@ -1823,6 +1834,273 @@ Public Class Form1
         TextBox1.AppendText($"{yaml}{vbCrLf}{vbCrLf}")
 
     End Sub
+
+    Enum ReaderState
+        Idle
+        ReadVertexes
+    End Enum
+    Private Sub FontTestToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles FontTestToolStripMenuItem.Click
+        Dim Strokes As List(Of Stroke)
+
+        LoadFonts()
+        Dim dxf As New DxfDocument
+        Dim utf8Encoding As New System.Text.UTF8Encoding()
+        Dim encodedString() As Byte
+        Dim st = "the quick brown fox jumps over the lazy dog! 0123456789"
+        'Dim st = "O Q"
+        encodedString = utf8Encoding.GetBytes(st)
+        Dim posn As New System.Windows.Point(0, 0)
+        For Each ch In st
+            If ch = " " Then
+                Width = 0       ' no strokes for space
+                Height = 0
+            Else
+                Strokes = FontData(Asc(ch)).Strokes      ' get list of strokes
+                For Each Stroke In Strokes
+                    Dim ply As New Polyline2D
+                    For Each vert In Stroke.Vertices
+                        ply.Vertexes.Add(New Polyline2DVertex(vert.X + posn.X, vert.Y + posn.Y))
+                    Next
+                    dxf.Entities.Add(ply)
+
+                Next
+                Width = FontData(Asc(ch)).width
+                Height = FontData(Asc(ch)).height
+            End If
+            posn.X += Width + 3
+        Next
+        dxf.Save("GlyphTest.dxf")
+    End Sub
+    Private Sub LoadFonts()
+        ' Load LibreCAD single stoke font
+
+        ' The LibreCAD font font is described below
+        '       Line 1 >= utf - 8 code + letter (same as QCAD)
+        '       Line 2 & 3 >= sequence like Polyline vertex with ";" seperating vertex and "," separating x,y coords
+
+        '       [0041] A
+        '       0.0000,0.0000;3.0000,9.0000;6.0000,9.000
+        '       1.0800,2.5500;4.7300,2.5500
+
+
+        '       Line 2 >= sequence like Polyline vertex with ";" seperating vertex And
+        '       "," separating x,y coords, if vertex Is prefixed with "A" the first field is a bulge
+        '       [0066] f
+        '       1.2873,0;1.2873,7.2945;3.4327,9.0000,A0.5590
+        '       0.000000,6.0000,3.0000,6.0000
+
+        '       Font vertexes are loaded, and if required additional vertexes are added representing the bulge
+
+        Dim State As ReaderState = ReaderState.Idle
+        Dim Strokes As List(Of Stroke) = Nothing
+
+        Dim FontPath = My.Settings.FontPath
+        If Not System.IO.Directory.Exists(FontPath) Then
+            MsgBox($"The font path {FontPath} cannot be found. Please use the parameters dialog to set one.", vbAbort + vbOK, "Font folder not found")
+            Exit Sub
+        Else
+            Dim FontFile = My.Settings.FontFile
+            If Not System.IO.File.Exists($"{FontPath}\{FontFile}") Then
+                MsgBox($"The font file {FontFile} cannot be found. Please use the parameters dialog to set one.", vbAbort + vbOK, "Font file not found")
+                Exit Sub
+            Else
+                FontData.Clear()        ' remove existing data
+                Dim Key As Integer
+
+                Dim fileReader As System.IO.StreamReader
+                fileReader =
+                My.Computer.FileSystem.OpenTextFileReader($"{FontPath}\{FontFile}")
+                Dim LineNumber As Integer = 0
+                While Not fileReader.EndOfStream        ' read all lines
+                    Dim line = fileReader.ReadLine
+                    LineNumber += 1
+                    Select Case State
+                        Case ReaderState.Idle
+                            Dim options As RegexOptions = RegexOptions.IgnoreCase
+                            Dim r As New Regex("^\[([0-9ABCDEF]+?)\]", options)    ' looking for UTF-8 code
+                            Dim matches = r.Matches(line)
+                            If matches.Count > 0 Then
+                                Key = Convert.ToInt32(matches(0).Groups(1).Value, 16)
+                                Strokes = New List(Of Stroke)    ' ready to store strokes
+                                State = ReaderState.ReadVertexes     ' we have read the key
+                            End If
+                        Case ReaderState.ReadVertexes
+                            If line = "" Then
+                                FontData.Add(Key, New Glyph(Strokes))  ' end of stroke list. Add strokes to glyph, and glyph to dictionary
+                                State = ReaderState.Idle    ' blank line. End of glyph
+                            Else
+                                Dim verts = Split(line, ";")    ' split line into vertexes
+                                Dim Stroke As New Stroke
+                                For Each Vertex In verts
+                                    Dim Coords = Split(Vertex, ",")    ' split into X,Y.   Could be X,Y or X,Y,Bulge
+                                    Select Case Coords.Count
+                                        Case 1
+                                            If Coords(0).StartsWith("C") Then
+                                                ' It's a copy of another glyph + extras
+                                                Coords(0) = Coords(0).Remove(0, 1)     ' remove the "C"
+                                                Dim k = Convert.ToInt32(Coords(0), 16)
+                                                For Each s In FontData(k).Strokes
+                                                    Strokes.Add(s)   ' copy the character strokes
+                                                Next
+                                            Else
+                                                Throw New System.Exception($"Illegal data on line {LineNumber}: {line}")
+                                            End If
+                                        Case 2 : Stroke.Vertices.Add(New Vertex(CDbl(Coords(0)), CDbl(Coords(1))))
+                                        Case 3
+                                            ' Vertex has a bulge. Apply bulge to vector and add
+                                            Dim bulge As Double = CDbl(Coords(2).Remove(0, 1))   ' remove the "A"
+                                            ' Generate points along the curve
+                                            Dim pathPoints() As Vertex = BulgePath.CalculateBulgePath(Stroke.Vertices.Last, New Vertex(CDbl(Coords(0)), CDbl(Coords(1))), bulge, 10)
+                                            For Each p In pathPoints
+                                                Stroke.Vertices.Add(New Vertex(p.X, p.Y))
+                                            Next
+                                        Case Else
+                                            Throw New System.Exception($"Illegal number of coordinates ({Coords.Count} on line {LineNumber}: {line}")
+                                    End Select
+                                Next
+                                Strokes.Add(Stroke)
+                            End If
+                    End Select
+                End While
+                fileReader.Close()
+                TextBox1.AppendText($"{FontData.Count} glyphs read from {FontPath}\{FontFile}{vbCrLf}")
+            End If
+        End If
+    End Sub
+
+    Private Sub Form1_Load(sender As Object, e As EventArgs) Handles Me.Load
+        LoadFonts()
+    End Sub
+End Class
+
+
+Public Class BulgePath
+
+    ''' <summary>
+    ''' Calculates a quadratic Bézier curve with specified bulge
+    ''' </summary>
+    ''' <param name="startPoint">Starting point</param>
+    ''' <param name="endPoint">Ending point</param>
+    ''' <param name="bulgeHeight">Bulge height (positive for right/up, negative for left/down)</param>
+    ''' <param name="numPoints">Number of points to generate along the curve</param>
+    ''' <returns>Array of points along the curve</returns>
+    Public Shared Function CalculateBulgePath(startPoint As Vertex, endPoint As Vertex,
+                                             bulgeHeight As Double,
+                                             Optional numPoints As Integer = 100) As Vertex()
+        ' Step 1: Calculate the midpoint
+        Dim midpoint As New Vertex(
+            (startPoint.X + endPoint.X) / 2,
+            (startPoint.Y + endPoint.Y) / 2
+        )
+
+        ' Step 2: Calculate unit vector perpendicular to the line
+        Dim vectorX As Double = endPoint.X - startPoint.X
+        Dim vectorY As Double = endPoint.Y - startPoint.Y
+        Dim length As Double = Math.Sqrt(vectorX * vectorX + vectorY * vectorY)
+
+        ' Perpendicular unit vector (rotate 90 degrees)
+        Dim perpX As Double = vectorY / length
+        Dim perpY As Double = -vectorX / length
+
+        ' Step 3: Calculate control point
+        Dim controlPoint As New Vertex(
+                    midpoint.X + (3 * bulgeHeight) * perpX,
+                    midpoint.Y + (3 * bulgeHeight) * perpY
+                )
+
+        ' Generate points along the quadratic Bézier curve
+        Dim points(numPoints) As Vertex
+        For i As Integer = 0 To numPoints
+            Dim t As Double = i / numPoints
+            points(i) = CalculatePointOnCurve(startPoint, controlPoint, endPoint, t)
+        Next
+
+        Return points
+    End Function
+
+    ''' <summary>
+    ''' Calculates a single point on a quadratic Bézier curve
+    ''' </summary>
+    ''' <param name="p0">Start point</param>
+    ''' <param name="p1">Control point</param>
+    ''' <param name="p2">End point</param>
+    ''' <param name="t">Parameter (0 to 1)</param>
+    ''' <returns>Point on the curve</returns>
+    Private Shared Function CalculatePointOnCurve(p0 As Vertex, p1 As Vertex, p2 As Vertex, t As Double) As Vertex
+        Dim oneMinusT As Double = 1 - t
+
+        ' Quadratic Bézier formula: (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
+        Dim x As Double = (oneMinusT * oneMinusT * p0.X) +
+                          (2 * oneMinusT * t * p1.X) +
+                          (t * t * p2.X)
+
+        Dim y As Double = (oneMinusT * oneMinusT * p0.Y) +
+                          (2 * oneMinusT * t * p1.Y) +
+                          (t * t * p2.Y)
+
+        Return New Vertex(x, y)
+    End Function
+End Class
+Public Class Glyph
+    Public Property Strokes As List(Of Stroke)
+    Public ReadOnly Property width As Double
+        Get
+            Dim w As Double = 0
+            For Each s In Strokes
+                For Each v In s.Vertices
+                    w = Math.Max(w, v.X)
+                Next
+            Next
+            Return w
+        End Get
+    End Property
+    Public ReadOnly Property height As Double
+        Get
+            Dim h As Double = 0
+            For Each s In Strokes
+                For Each v In s.Vertices
+                    h = Math.Max(h, v.X)
+                Next
+            Next
+            Return h
+        End Get
+    End Property
+    Public Sub New()
+        Me.Strokes = New List(Of Stroke)()
+    End Sub
+
+    Public Sub New(strokes As List(Of Stroke))
+        Me.Strokes = strokes
+    End Sub
+End Class
+
+Public Class Stroke
+    Public Property Vertices As List(Of Vertex)
+    Public Sub New()
+        Me.Vertices = New List(Of Vertex)()
+    End Sub
+    Public Sub New(vertices As List(Of Vertex))
+        Me.Vertices = vertices
+    End Sub
+End Class
+
+Public Class Vertex
+    ' A vertex in a stroke
+    Public Property X As Double
+    Public Property Y As Double
+    Public Sub New(x As Double, y As Double)
+        Me.X = x
+        Me.Y = y
+    End Sub
+
+    ' Test for equality
+    Public Shared Operator =(ByVal v1 As Vertex, v2 As Vertex) As Boolean
+        Return v1.X = v2.X AndAlso v1.Y = v2.Y
+    End Operator
+    ' Test for equality
+    Public Shared Operator <>(ByVal v1 As Vertex, v2 As Vertex) As Boolean
+        Return Not v1 = v2
+    End Operator
 End Class
 Public Class IntPoint
     Public Property X As Integer
