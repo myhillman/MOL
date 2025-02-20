@@ -16,6 +16,8 @@ Imports System.Text
 Imports MOL.Form1
 Imports System.DirectoryServices.ActiveDirectory
 Imports System.Text.Unicode
+Imports System.Windows.Ink
+Imports System.Windows.Media.Imaging
 
 ' Define the different block types
 Public Enum BLOCKTYPE
@@ -883,7 +885,6 @@ Public Class Form1
         Dim CellMargin = New Size(1.5, 1.5)                 ' margin around each cell
         Dim GridLine = New System.Windows.Rect(-67, -80, (CellSize.Width + CellMargin.Width) * 10, (CellSize.Height + CellMargin.Height) * 10)   ' rectangle for the grid of test card grid
         Dim cellDimension = New Size(CellSize.Width + CellMargin.Width, CellSize.Height + CellMargin.Height)    ' Size of overall cell
-        'GridLine.Transform(ScaleToSteps)
 
         ' Make an array of speed and power settings for the test card
         For i = 0 To Speeds.Length - 1
@@ -1023,18 +1024,18 @@ Public Class Form1
         PutInt(BlockNumber, &H7C + 4)
         WriteMOL(MOL_BEGSUBa, {4}, StartofBlock)    ' begin SUB
         UseMCBLK = True
-        DrawText(writer, dxf, My.Settings.Material, System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + (Outline.Width / 2), -5), 5, 0)
-        DrawText(writer, dxf, $"Interval: {My.Settings.Interval} mm", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -9.5), 5, 0)
-        DrawText(writer, dxf, $"Passes: { My.Settings.Passes}", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -14), 5, 0)
+        DrawText(writer, dxf, My.Settings.Material, System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + (Outline.Width / 2), -5), 3, 0)
+        DrawText(writer, dxf, $"Interval: {My.Settings.Interval} mm", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -9.5), 3, 0)
+        DrawText(writer, dxf, $"Passes: { My.Settings.Passes}", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -14), 3, 0)
         ' Put labels on the axes
         For speed = 0 To speeds.Length - 1
-            DrawText(writer, dxf, $"{speeds(speed)}", System.Windows.TextAlignment.Left, New System.Windows.Point(Outline.Left - 8, Outline.Top + speed * cellsize.Height + 2), cellsize.Width, 0)
+            DrawText(writer, dxf, $"{speeds(speed)}", System.Windows.TextAlignment.Left, New System.Windows.Point(Outline.Left - 8, Outline.Top + speed * cellsize.Height + 2), 3, 0)
         Next
         For power = 0 To powers.Length - 1
-            DrawText(writer, dxf, $"{powers(power)}", System.Windows.TextAlignment.Left, New System.Windows.Point(Outline.Left + power * cellsize.Width + 4, Outline.Top - 8), 6, 90)
+            DrawText(writer, dxf, $"{powers(power)}", System.Windows.TextAlignment.Left, New System.Windows.Point(Outline.Left + power * cellsize.Width + 6, Outline.Top - 8), 3, 90)
         Next
-        DrawText(writer, dxf, "Power (%)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -95), 10, 0)
-        DrawText(writer, dxf, "Speed (mm/s)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left - 10, -Outline.Height / 1.3), 10, 90)
+        DrawText(writer, dxf, "Power (%)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, Outline.Top - 18), 5, 0)
+        DrawText(writer, dxf, "Speed (mm/s)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left - 10, Outline.Bottom - Outline.Height / 2), 5, 90)
         ' Finish block
         FlushMCBLK(False)
         WriteMOL(MOL_ENDSUB, {4})    ' end SUB 
@@ -1291,70 +1292,40 @@ Public Class Form1
 
     Public Sub DrawText(writer As BinaryWriter, dxf As DxfDocument, text As String, alignment As System.Windows.TextAlignment, origin As System.Windows.Point, fontsize As Double, angle As Double)
         ' Write some text at specified size, position and angle
-        ' Initially this writes to a DXF file for testing, but will eventually write to a MOL file
 
-        Dim font = New FontFamily("1CamBam_Stick_0")      ' pick a font
-        Dim typeface = New Typeface(font, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal)
-        Dim emSize = fontsize * 96.0 / 72.0
-        Const PixelsPerDip = 1
-        Dim FontStyle = FontStyles.Normal
-        Dim fontWeight = FontWeights.Light
+        Dim Strokes = DisplayString(text, alignment, origin, fontsize, angle)       ' Convert the text to strokes
         Dim shading = PowerSpeedColor(My.Settings.PowerMax / 2, My.Settings.SpeedMax / 2)      ' use 50% power and speed for text
-        ' Create the formatted text based on the properties set.
-        Dim FormattedText As New FormattedText(text,
-                    CultureInfo.GetCultureInfo("en-us"),
-                    FlowDirection.LeftToRight,
-                    typeface,
-                    emSize,
-                    Brushes.DimGray,
-                    PixelsPerDip) With {
-                        .TextAlignment = alignment
-                    }
-        ' Build the geometry object that represents the text, and extract vectors.
-        Dim _textGeometry As Geometry = FormattedText.BuildGeometry(New System.Windows.Point(0, 0))
-        ' massage the geometry to get it in the right place
-        Dim transforms As New TransformGroup
-        With transforms
-            .Children.Add(New TranslateTransform(0, -_textGeometry.Bounds.Top)) ' move the text to the origin
-            .Children.Add(New ScaleTransform(1, -1))   ' reflect in y axis
-            .Children.Add(New TranslateTransform(0, _textGeometry.Bounds.Height))    ' move geometry back to bottom left
-            .Children.Add(New RotateTransform(angle))                    ' rotate  
-            Dim TextScale = 0.352778    ' conversion of points to mm
-            .Children.Add(New ScaleTransform(TextScale, TextScale))       ' scale points to mm
-            .Children.Add(New TranslateTransform(origin.X, origin.Y))    ' move geometry to origin
-            .Children.Add(New ScaleTransform(xScale, yScale))       ' scale mm to steps
-        End With
-        _textGeometry.Transform = transforms
-
-        ' Build the geometry object that represents the text, and extract vectors.
-        Dim Flattened As PathGeometry = _textGeometry.GetFlattenedPathGeometry(fontsize / 8, ToleranceType.Relative)
 
         ' draw the text
         ' DXF first
         UseMCBLK = True
-        ' Geometry is at the origin, so all coordinates are absolute
-        For Each figure As PathFigure In Flattened.Figures
+        ' First render each stroke to DXF
+        For Each stroke In Strokes
+            stroke.Color = shading
+            DXF_polyline2d(stroke, TextLayer)       ' Delay output of polyline to prevent position corruption
+        Next
+
+        ' render to MOL
+        Dim matrix As New Matrix4()
+        ' Initialize the matrix elements to do scaling only
+        With matrix
+            .M11 = xScale : .M12 = 0 : .M13 = 0 : .M14 = 0
+            .M21 = 0 : .M22 = yScale : .M23 = 0 : .M24 = 0
+            .M31 = 0 : .M32 = 0 : .M33 = 1 : .M34 = 0
+            .M41 = 0 : .M42 = 0 : .M43 = 0 : .M44 = 1
+        End With
+        For Each stroke In Strokes
+            stroke.TransformBy(matrix)    ' convert mm data to steps
             ' if this is the first figure in SUBR 4, record in StartPosns
-            Dim StartPoint As New IntPoint(figure.StartPoint.X, figure.StartPoint.Y)
+            Dim StartPoint As New IntPoint(stroke.Vertexes.First.Position.X, stroke.Vertexes.First.Position.Y)
             If Not StartPosns.ContainsKey(4) Then
                 Dim offset As IntPoint = StartPoint - position
                 TextBox1.AppendText($"Setting subr 4 offset to ({offset.X},{offset.Y}){vbCrLf}")
                 StartPosns.Add(4, (False, offset))            ' start offset for this subroutine
                 position = StartPoint     ' position will be StartPoint when subr executes
             End If
-            Dim motion = New Polyline2D With {.Color = shading}
-            motion.Vertexes.Add(New Polyline2DVertex(StartPoint.X, StartPoint.Y))
-            For Each seg As PathSegment In figure.Segments
-                Dim pnts = CType(seg, PolyLineSegment).Points
-                For Each pnt In pnts
-                    motion.Vertexes.Add(New Polyline2DVertex(pnt.X, pnt.Y))     ' add point to polyline
-                Next
-            Next
 
             '
-            ' Now create a MOL equivalent of the DXF polyline
-            ' motion.TransformBy(Matrix3.Identity, New Vector3(-origin.X, -origin.Y, 0))      ' vertexes in motion are absolute. Need to convert them to relative to origin
-
             ' Get to the start position of this stroke
             Dim delta As IntPoint = StartPoint - position
             If delta <> ZERO Then
@@ -1363,14 +1334,13 @@ Public Class Form1
             End If
             WriteMOL(MOL_LASER, {OnOff_type.[On]})
             ' Process all vertexes, except the first
-            For p = 1 To motion.Vertexes.Count - 1
-                Dim thispoint = New IntPoint(motion.Vertexes(p).Position.X, motion.Vertexes(p).Position.Y)
+            For p = 1 To stroke.Vertexes.Count - 1
+                Dim thispoint = New IntPoint(stroke.Vertexes(p).Position.X, stroke.Vertexes(p).Position.Y)
                 delta = thispoint - position
                 MoveRelativeSplit(delta)          ' draw stroke
             Next
             WriteMOL(MOL_LASER, {OnOff_type.Off})
 
-            DXF_polyline2d(motion, TextLayer, 1 / xScale)       ' Delay output of polyline to prevent position corruption
         Next
         FlushMCBLK(False)
     End Sub
@@ -1813,11 +1783,6 @@ Public Class Form1
         dxf.Save("LineTest.dxf")
     End Sub
 
-    Private Sub SHXTestToolStripMenuItem_Click(sender As Object, e As EventArgs)
-
-
-    End Sub
-
     Private Sub ConvertLeetroToIEEEToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConvertLeetroToIEEEToolStripMenuItem.Click
         Dim hex As String = InputBox("Input Leetro float in hex format", "")
         Dim value As UInt32 = Convert.ToUInt32(hex, 16)
@@ -1840,41 +1805,174 @@ Public Class Form1
         ReadVertexes
     End Enum
     Private Sub FontTestToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles FontTestToolStripMenuItem.Click
-        Dim Strokes As List(Of Stroke)
 
-        LoadFonts()
         Dim dxf As New DxfDocument
+        Dim st = "the quick brown fox jumps over the lazy dog! 0123456789"
+        Dim ply = DisplayString(st, System.Windows.TextAlignment.Left, New System.Windows.Point(10, 10), 9, 0)
+
+        For Each pl In ply
+            dxf.Entities.Add(pl)
+        Next
+
+        ' Draw a crosshair
+        Dim Cross As New System.Windows.Point(300, 300)
+        Dim w As New System.Windows.Size(10, 10)
+        Dim ln As New Line(New Vector2(Cross.X - w.Width, Cross.Y), New Vector2(Cross.X + w.Width, Cross.Y)) With {.Color = AciColor.Red}
+        dxf.Entities.Add(ln)
+        ln = New Line(New Vector2(Cross.X, Cross.Y - w.Height), New Vector2(Cross.X, Cross.Y + w.Height)) With {.Color = AciColor.Red}
+        dxf.Entities.Add(ln)
+
+        st = "String at 0 center"
+        ply = DisplayString(st, System.Windows.TextAlignment.Center, Cross, 10, 0)
+        For Each pl In ply
+            dxf.Entities.Add(pl)
+        Next
+        st = "String at 90 left"
+        ply = DisplayString(st, System.Windows.TextAlignment.Left, Cross, 10, 90)
+        For Each pl In ply
+            dxf.Entities.Add(pl)
+        Next
+        st = "String at 45 right"
+        ply = DisplayString(st, System.Windows.TextAlignment.Right, Cross, 10, 45)
+        For Each pl In ply
+            dxf.Entities.Add(pl)
+        Next
+
+        st = "Power (%) - 10mm"
+        ply = DisplayString(st, System.Windows.TextAlignment.Left, New System.Windows.Point(50, 50), 10, 45)
+        For Each pl In ply
+            dxf.Entities.Add(pl)
+        Next
+
+        st = "This is left justified - 5mm"
+        ply = DisplayString(st, System.Windows.TextAlignment.Left, New System.Windows.Point(200, 60), 5, 0)
+        For Each pl In ply
+            dxf.Entities.Add(pl)
+        Next
+        st = "This is center justified - 5mm"
+        ply = DisplayString(st, System.Windows.TextAlignment.Center, New System.Windows.Point(200, 70), 5, 0)
+        For Each pl In ply
+            dxf.Entities.Add(pl)
+        Next
+        st = "This is right justified - 5mm"
+        ply = DisplayString(st, System.Windows.TextAlignment.Right, New System.Windows.Point(200, 80), 5, 0)
+        For Each pl In ply
+            dxf.Entities.Add(pl)
+        Next
+        st = "This is center justified - 20mm"
+        ply = DisplayString(st, System.Windows.TextAlignment.Center, New System.Windows.Point(200, 90), 20, 0)
+        For Each pl In ply
+            dxf.Entities.Add(pl)
+        Next
+        dxf.Save("GlyphTest.dxf")
+        TextBox1.AppendText("Done")
+    End Sub
+
+    Function DisplayString(text As String, alignment As System.Windows.TextAlignment, origin As System.Windows.Point, fontsize As Double, rotation As Double) As List(Of Polyline2D)
+        ' Generate a list of Polyline2D for a string at origin, with scale and rotation
+        ' text - string to be rendered
+        ' alignment - left, center or right about origin
+        ' fontsize - in mm
+        ' rotation - about origin in degrees
+        ' Returns a polyline for each stroke
+
+        Const RawFontSize = 9     ' the fonts are defined 9 units high
+        Dim Width As Double
+        Dim Strokes As New List(Of Stroke)
         Dim utf8Encoding As New System.Text.UTF8Encoding()
         Dim encodedString() As Byte
-        Dim st = "the quick brown fox jumps over the lazy dog! 0123456789"
-        'Dim st = "O Q"
-        encodedString = utf8Encoding.GetBytes(st)
-        Dim posn As New System.Windows.Point(0, 0)
-        For Each ch In st
+        Dim baseline As Integer = 0
+        Dim result As New List(Of Polyline2D)
+        Dim ply As Polyline2D
+
+        encodedString = utf8Encoding.GetBytes(text)       ' encode string to UTF-8
+        ' Create a matrix to perform scaling, rotation and translation
+        Dim TranslateMatrix As New Matrix4()        ' Matrix to perform a translation only
+        With TranslateMatrix
+            .M11 = 1 : .M12 = 0 : .M13 = 0 : .M14 = origin.X
+            .M21 = 0 : .M22 = 1 : .M23 = 0 : .M24 = origin.Y
+            .M31 = 0 : .M32 = 0 : .M33 = 1 : .M34 = 0
+            .M41 = 0 : .M42 = 0 : .M43 = 0 : .M44 = 1
+        End With
+
+        Dim RotateMatrix As New Matrix4()           ' Matrix to perform a rotation
+        Dim cosTheta = Math.Cos(rotation * Math.PI / 180.0)
+        Dim sinTheta = Math.Sin(rotation * Math.PI / 180.0)
+        With RotateMatrix
+            .M11 = cosTheta : .M12 = -sinTheta : .M13 = 0 : .M14 = 0
+            .M21 = sinTheta : .M22 = cosTheta : .M23 = 0 : .M24 = 0
+            .M31 = 0 : .M32 = 0 : .M33 = 1 : .M34 = 0
+            .M41 = 0 : .M42 = 0 : .M43 = 0 : .M44 = 1
+        End With
+
+        Dim ScaleMatrix As New Matrix4()           ' Matrix to perform a scale
+        Dim scale = fontsize / RawFontSize          ' scale font to required fontsize mm
+        With ScaleMatrix
+            .M11 = scale : .M12 = 0 : .M13 = 0 : .M14 = 0
+            .M21 = 0 : .M22 = scale : .M23 = 0 : .M24 = 0
+            .M31 = 0 : .M32 = 0 : .M33 = 1 : .M34 = 0
+            .M41 = 0 : .M42 = 0 : .M43 = 0 : .M44 = 1
+        End With
+
+        For Each ch In text
             If ch = " " Then
                 Width = 0       ' no strokes for space
-                Height = 0
             Else
                 Strokes = FontData(Asc(ch)).Strokes      ' get list of strokes
                 For Each Stroke In Strokes
-                    Dim ply As New Polyline2D
+                    ply = New Polyline2D    ' create polyline for this stroke
                     For Each vert In Stroke.Vertices
-                        ply.Vertexes.Add(New Polyline2DVertex(vert.X + posn.X, vert.Y + posn.Y))
+                        ply.Vertexes.Add(New Polyline2DVertex(vert.X + baseline, vert.Y))
                     Next
-                    dxf.Entities.Add(ply)
-
+                    result.Add(ply)             ' add to result
                 Next
-                Width = FontData(Asc(ch)).width
-                Height = FontData(Asc(ch)).height
+                Width = FontData(Asc(ch)).Width ' get scaled width of this character
             End If
-            posn.X += Width + 3
+            baseline += Width + 3       ' leave gap between characters
         Next
-        dxf.Save("GlyphTest.dxf")
-    End Sub
+        ' Now transform result to account for scale, rotation, origin and alignment
+        Dim offset As Double
+        ' remember the original origin
+        Dim m14 = TranslateMatrix.M14
+        Dim m24 = TranslateMatrix.M24
+
+        Select Case alignment
+            Case System.Windows.TextAlignment.Left
+                offset = 0      ' Nothing to do. Is left aligned
+            Case System.Windows.TextAlignment.Center
+                offset = -baseline / 2              ' shift origin to middle of string
+            Case System.Windows.TextAlignment.Right
+                offset = -(baseline - 3)               ' shift origin to right of string
+            Case Else
+                Throw New System.Exception($"Unrecognised alignment value: {alignment}")
+        End Select
+
+        ' Polylines are based at (0,0)
+        For Each p In result
+            If offset <> 0 Then
+                With TranslateMatrix
+                    .M14 = offset   ' translate origin to left, center or right of string
+                    .M24 = 0
+                End With
+                p.TransformBy(TranslateMatrix)
+            End If
+            If rotation <> 0 Then
+                p.TransformBy(RotateMatrix)
+            End If
+            p.TransformBy(ScaleMatrix)      ' do the scale
+            ' translate to intended location
+            With TranslateMatrix
+                .M14 = origin.X
+                .M24 = origin.Y
+            End With
+            p.TransformBy(TranslateMatrix)
+        Next
+        Return result
+    End Function
     Private Sub LoadFonts()
         ' Load LibreCAD single stoke font
 
-        ' The LibreCAD font font is described below
+        ' The LibreCAD font format is described below
         '       Line 1 >= utf - 8 code + letter (same as QCAD)
         '       Line 2 & 3 >= sequence like Polyline vertex with ";" seperating vertex and "," separating x,y coords
 
@@ -1889,7 +1987,16 @@ Public Class Form1
         '       1.2873,0;1.2873,7.2945;3.4327,9.0000,A0.5590
         '       0.000000,6.0000,3.0000,6.0000
 
+        '       A "C" preceding a UTF-8 code means copy these strokes.
+        '       As below, a Q is made from an O, with one stroke added
+        '       [0051] Q
+        '       C004f
+        '       6,0;4,2
+
+
         '       Font vertexes are loaded, and if required additional vertexes are added representing the bulge
+
+        ' The font is 9 units high. Widths vary.
 
         Dim State As ReaderState = ReaderState.Idle
         Dim Strokes As List(Of Stroke) = Nothing
@@ -1933,9 +2040,9 @@ Public Class Form1
                                 Dim Stroke As New Stroke
                                 For Each Vertex In verts
                                     Dim Coords = Split(Vertex, ",")    ' split into X,Y.   Could be X,Y or X,Y,Bulge
-                                    Select Case Coords.Count
+                                    Select Case Coords.Length
                                         Case 1
-                                            If Coords(0).StartsWith("C") Then
+                                            If Coords(0).StartsWith("C"c) Then
                                                 ' It's a copy of another glyph + extras
                                                 Coords(0) = Coords(0).Remove(0, 1)     ' remove the "C"
                                                 Dim k = Convert.ToInt32(Coords(0), 16)
@@ -1955,7 +2062,7 @@ Public Class Form1
                                                 Stroke.Vertices.Add(New Vertex(p.X, p.Y))
                                             Next
                                         Case Else
-                                            Throw New System.Exception($"Illegal number of coordinates ({Coords.Count} on line {LineNumber}: {line}")
+                                            Throw New System.Exception($"Illegal number of coordinates ({Coords.Length} on line {LineNumber}: {line}")
                                     End Select
                                 Next
                                 Strokes.Add(Stroke)
@@ -2043,7 +2150,7 @@ Public Class BulgePath
 End Class
 Public Class Glyph
     Public Property Strokes As List(Of Stroke)
-    Public ReadOnly Property width As Double
+    Public ReadOnly Property Width As Double
         Get
             Dim w As Double = 0
             For Each s In Strokes
@@ -2052,17 +2159,6 @@ Public Class Glyph
                 Next
             Next
             Return w
-        End Get
-    End Property
-    Public ReadOnly Property height As Double
-        Get
-            Dim h As Double = 0
-            For Each s In Strokes
-                For Each v In s.Vertices
-                    h = Math.Max(h, v.X)
-                Next
-            Next
-            Return h
         End Get
     End Property
     Public Sub New()
