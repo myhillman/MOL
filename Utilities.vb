@@ -1,5 +1,7 @@
-﻿Imports System.Runtime.InteropServices
+﻿Imports System.Reflection.Metadata
+Imports System.Runtime.InteropServices
 Imports netDxf
+Imports netDxf.Entities
 
 ' Miscellaneous SHARED routines that don't belong in a class
 Friend Module Utilities
@@ -82,27 +84,33 @@ Friend Module Utilities
         Return Math.Sqrt((p1.X - p2.X) ^ 2 + (p1.Y - p2.Y) ^ 2)
     End Function
 
-    Public Function SolveQuadratic(s As Double, u As Double, a As Double) As (Double, Double)
-        ' Coefficients for the quadratic equation
-        ' Solve s = ut + 0.5 a * t^2
-        Dim AA As Double = 0.5 * a
-        Dim B As Double = u
-        Dim C As Double = -s
-
-        ' Calculate the discriminant
-        Dim discriminant As Double = B * B - 4 * AA * C
-
-        ' Check if the discriminant is negative, zero, or positive
-        If discriminant < 0 Then
-            Throw New ArgumentException("No real solutions exist.")
-        End If
-
-        ' Calculate the two solutions using the quadratic formula
-        Dim t1 As Double = (-B + Math.Sqrt(discriminant)) / (2 * AA)
-        Dim t2 As Double = (-B - Math.Sqrt(discriminant)) / (2 * AA)
-
-        ' Return the solutions as a tuple
-        Return (t1, t2)
+    Public Function DegToRad(deg As Double) As Double
+        ' convert degrees to radians
+        Return deg * Math.PI / 180.0
     End Function
 
+    Function GenerateBulge(startpoint As Vector2, Endpoint As Vector2, bulge As Double, Optional numpoints As Integer = 10) As Polyline2D
+        ' Given a vector startpoint, endpoint and bulge, create a Polyline2D representing the bulge points
+        ' The arc will contain numpoints points, default 10
+        Dim result As New Polyline2D
+        If bulge = 0 Or Math.Abs(bulge) > 1 Then Throw New System.Exception($"A bulge value of {bulge} is not valid")
+        ' Item1=center, Item2=radius, Item3=StartAngle, Item4=EndAngle
+        ' StartAngle and EndAngle are wrt to line joining StartPoint and EndPoint
+
+        Dim arc = MathHelper.ArcFromBulge(startpoint, Endpoint, bulge)
+        Dim StartAngleRad = DegToRad(arc.Item3)
+        Dim EndAngleRad = DegToRad(arc.Item4)
+        ' Ensure the angles are in the correct order
+        If EndAngleRad < StartAngleRad Then
+            EndAngleRad += 2 * Math.PI
+        End If
+        Dim angleIncrement = (EndAngleRad - StartAngleRad) / (numpoints - 1)
+        For i = 0 To numpoints - 1
+            Dim angle = StartAngleRad + i * angleIncrement
+            Dim x = arc.Item1.X + arc.Item2 * Math.Cos(angle)
+            Dim y = arc.Item1.Y + arc.Item2 * Math.Sin(angle)
+            result.Vertexes.Add(New Polyline2DVertex(x, y))
+        Next
+        Return result
+    End Function
 End Module

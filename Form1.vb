@@ -18,6 +18,7 @@ Imports System.DirectoryServices.ActiveDirectory
 Imports System.Text.Unicode
 Imports System.Windows.Ink
 Imports System.Windows.Media.Imaging
+Imports System.Windows.Forms.VisualStyles.VisualStyleElement.ToolTip
 
 ' Define the different block types
 Public Enum BLOCKTYPE
@@ -1029,13 +1030,13 @@ Public Class Form1
         DrawText(writer, dxf, $"Passes: { My.Settings.Passes}", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -14), 3, 0)
         ' Put labels on the axes
         For speed = 0 To speeds.Length - 1
-            DrawText(writer, dxf, $"{speeds(speed)}", System.Windows.TextAlignment.Left, New System.Windows.Point(Outline.Left - 8, Outline.Top + speed * cellsize.Height + 2), 3, 0)
+            DrawText(writer, dxf, $"{speeds(speed)}", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left - 4, Outline.Top + speed * cellsize.Height + 2), 3, 0)
         Next
         For power = 0 To powers.Length - 1
-            DrawText(writer, dxf, $"{powers(power)}", System.Windows.TextAlignment.Left, New System.Windows.Point(Outline.Left + power * cellsize.Width + 6, Outline.Top - 8), 3, 90)
+            DrawText(writer, dxf, $"{powers(power)}", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + power * cellsize.Width + 6, Outline.Top - 4), 3, 90)
         Next
-        DrawText(writer, dxf, "Power (%)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, Outline.Top - 18), 5, 0)
-        DrawText(writer, dxf, "Speed (mm/s)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left - 10, Outline.Bottom - Outline.Height / 2), 5, 90)
+        DrawText(writer, dxf, "Power (%)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, Outline.Top - 16), 5, 0)
+        DrawText(writer, dxf, "Speed (mm/s)", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left - 9, Outline.Bottom - Outline.Height / 2), 5, 90)
         ' Finish block
         FlushMCBLK(False)
         WriteMOL(MOL_ENDSUB, {4})    ' end SUB 
@@ -1726,7 +1727,7 @@ Public Class Form1
                 .Position = New Vector3(rect.X + rect.Width / 2, rect.Y - rect.Height / 10, 0),
                 .Alignment = Entities.TextAlignment.TopCenter,
                 .Layer = TextLayer,
-                .Height = Math.Max(rect.Width, rect.Height) / 20
+                .Height = Math.Max(rect.Width, rect.Height) / 25
                 }
             dxf.Entities.Add(entity)
             ' Save dxf in file
@@ -1805,10 +1806,11 @@ Public Class Form1
         ReadVertexes
     End Enum
     Private Sub FontTestToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles FontTestToolStripMenuItem.Click
-
         Dim dxf As New DxfDocument
-        Dim st = "the quick brown fox jumps over the lazy dog! 0123456789"
-        Dim ply = DisplayString(st, System.Windows.TextAlignment.Left, New System.Windows.Point(10, 10), 9, 0)
+        Dim st As String, ply As List(Of Polyline2D)
+
+        st = "the quick brown fox jumps over the lazy dog! 0123456789"
+        ply = DisplayString(st, System.Windows.TextAlignment.Left, New System.Windows.Point(10, 10), 9, 0)
 
         For Each pl In ply
             dxf.Entities.Add(pl)
@@ -1821,6 +1823,12 @@ Public Class Form1
         dxf.Entities.Add(ln)
         ln = New Line(New Vector2(Cross.X, Cross.Y - w.Height), New Vector2(Cross.X, Cross.Y + w.Height)) With {.Color = AciColor.Red}
         dxf.Entities.Add(ln)
+        ' 5,2.5;0,2.5,A-1;0,6.5;5,6.5,A-1;5,2.5 = "O"
+        ' 1,10;1,-1,A0.181818   = "("
+
+        Dim polyl As New Polyline2D
+        polyl.Vertexes.Add(New Polyline2DVertex(New Vector2(1, 10)))
+        polyl.Vertexes.Add(New Polyline2DVertex(New Vector2(1, -1), 0.181818))
 
         st = "String at 0 center"
         ply = DisplayString(st, System.Windows.TextAlignment.Center, Cross, 10, 0)
@@ -1864,6 +1872,7 @@ Public Class Form1
         For Each pl In ply
             dxf.Entities.Add(pl)
         Next
+
         dxf.Save("GlyphTest.dxf")
         TextBox1.AppendText("Done")
     End Sub
@@ -1877,11 +1886,12 @@ Public Class Form1
         ' Returns a polyline for each stroke
 
         Const RawFontSize = 9     ' the fonts are defined 9 units high
+        Const LetterSpacing = 3       ' space between letters
         Dim Width As Double
-        Dim Strokes As New List(Of Stroke)
+        Dim Strokes As New List(Of Polyline2D)
         Dim utf8Encoding As New System.Text.UTF8Encoding()
         Dim encodedString() As Byte
-        Dim baseline As Integer = 0
+        Dim baseline As Integer = 0             ' X position of next character
         Dim result As New List(Of Polyline2D)
         Dim ply As Polyline2D
 
@@ -1889,27 +1899,19 @@ Public Class Form1
         ' Create a matrix to perform scaling, rotation and translation
         Dim TranslateMatrix As New Matrix4()        ' Matrix to perform a translation only
         With TranslateMatrix
-            .M11 = 1 : .M12 = 0 : .M13 = 0 : .M14 = origin.X
-            .M21 = 0 : .M22 = 1 : .M23 = 0 : .M24 = origin.Y
+            .M11 = 1 : .M12 = 0 : .M13 = 0 : .M14 = 0
+            .M21 = 0 : .M22 = 1 : .M23 = 0 : .M24 = 0
             .M31 = 0 : .M32 = 0 : .M33 = 1 : .M34 = 0
             .M41 = 0 : .M42 = 0 : .M43 = 0 : .M44 = 1
         End With
 
-        Dim RotateMatrix As New Matrix4()           ' Matrix to perform a rotation
+        Dim TransformMatrix As New Matrix4()           ' Matrix to perform a rotation, scaling and traslation
         Dim cosTheta = Math.Cos(rotation * Math.PI / 180.0)
         Dim sinTheta = Math.Sin(rotation * Math.PI / 180.0)
-        With RotateMatrix
-            .M11 = cosTheta : .M12 = -sinTheta : .M13 = 0 : .M14 = 0
-            .M21 = sinTheta : .M22 = cosTheta : .M23 = 0 : .M24 = 0
-            .M31 = 0 : .M32 = 0 : .M33 = 1 : .M34 = 0
-            .M41 = 0 : .M42 = 0 : .M43 = 0 : .M44 = 1
-        End With
-
-        Dim ScaleMatrix As New Matrix4()           ' Matrix to perform a scale
         Dim scale = fontsize / RawFontSize          ' scale font to required fontsize mm
-        With ScaleMatrix
-            .M11 = scale : .M12 = 0 : .M13 = 0 : .M14 = 0
-            .M21 = 0 : .M22 = scale : .M23 = 0 : .M24 = 0
+        With TransformMatrix
+            .M11 = scale * cosTheta : .M12 = scale * -sinTheta : .M13 = 0 : .M14 = origin.X
+            .M21 = scale * sinTheta : .M22 = scale * cosTheta : .M23 = 0 : .M24 = origin.Y
             .M31 = 0 : .M32 = 0 : .M33 = 1 : .M34 = 0
             .M41 = 0 : .M42 = 0 : .M43 = 0 : .M44 = 1
         End With
@@ -1921,14 +1923,31 @@ Public Class Form1
                 Strokes = FontData(Asc(ch)).Strokes      ' get list of strokes
                 For Each Stroke In Strokes
                     ply = New Polyline2D    ' create polyline for this stroke
-                    For Each vert In Stroke.Vertices
-                        ply.Vertexes.Add(New Polyline2DVertex(vert.X + baseline, vert.Y))
+                    For i = 0 To Stroke.Vertexes.Count - 1
+                        If Stroke.Vertexes(i).Bulge <> 0 Then
+                            ' segment has a bulge - generate a bulge
+                            Dim StartPoint = Stroke.Vertexes(i - 1).Position
+                            Dim Endpoint = Stroke.Vertexes(i).Position
+                            Dim arc = GenerateBulge(StartPoint, Endpoint, Stroke.Vertexes(i).Bulge)
+                            If arc.Vertexes(0).Position = Endpoint Then arc.Vertexes.Reverse()       ' the arc is reversed
+                            arc.Vertexes.RemoveAt(0)        ' the first vertex is the last of the previous line
+                            For v = 0 To arc.Vertexes.Count - 1
+                                ply.Vertexes.Add(arc.Vertexes(v))
+                            Next
+                        Else
+                            ply.Vertexes.Add(New Polyline2DVertex(Stroke.Vertexes(i).Position.X, Stroke.Vertexes(i).Position.Y))
+                        End If
                     Next
+                    With TranslateMatrix
+                        .M14 = baseline
+                        .M24 = 0
+                    End With
+                    ply.TransformBy(TranslateMatrix)        ' move stroke to start of letter
                     result.Add(ply)             ' add to result
                 Next
-                Width = FontData(Asc(ch)).Width ' get scaled width of this character
+                Width = FontData(Asc(ch)).Width ' get width of this character (ignores bulge)
             End If
-            baseline += Width + 3       ' leave gap between characters
+            baseline += Width + LetterSpacing       ' leave gap between characters
         Next
         ' Now transform result to account for scale, rotation, origin and alignment
         Dim offset As Double
@@ -1940,9 +1959,9 @@ Public Class Form1
             Case System.Windows.TextAlignment.Left
                 offset = 0      ' Nothing to do. Is left aligned
             Case System.Windows.TextAlignment.Center
-                offset = -baseline / 2              ' shift origin to middle of string
+                offset = -(baseline - LetterSpacing) / 2              ' shift origin to middle of string
             Case System.Windows.TextAlignment.Right
-                offset = -(baseline - 3)               ' shift origin to right of string
+                offset = -(baseline - LetterSpacing)               ' shift origin to right of string
             Case Else
                 Throw New System.Exception($"Unrecognised alignment value: {alignment}")
         End Select
@@ -1956,16 +1975,7 @@ Public Class Form1
                 End With
                 p.TransformBy(TranslateMatrix)
             End If
-            If rotation <> 0 Then
-                p.TransformBy(RotateMatrix)
-            End If
-            p.TransformBy(ScaleMatrix)      ' do the scale
-            ' translate to intended location
-            With TranslateMatrix
-                .M14 = origin.X
-                .M24 = origin.Y
-            End With
-            p.TransformBy(TranslateMatrix)
+            p.TransformBy(TransformMatrix)
         Next
         Return result
     End Function
@@ -1999,7 +2009,8 @@ Public Class Form1
         ' The font is 9 units high. Widths vary.
 
         Dim State As ReaderState = ReaderState.Idle
-        Dim Strokes As List(Of Stroke) = Nothing
+        Dim Strokes As List(Of Polyline2D) = Nothing
+        Dim stroke As Polyline2D
 
         Dim FontPath = My.Settings.FontPath
         If Not System.IO.Directory.Exists(FontPath) Then
@@ -2028,7 +2039,7 @@ Public Class Form1
                             Dim matches = r.Matches(line)
                             If matches.Count > 0 Then
                                 Key = Convert.ToInt32(matches(0).Groups(1).Value, 16)
-                                Strokes = New List(Of Stroke)    ' ready to store strokes
+                                Strokes = New List(Of Polyline2D)    ' ready to store strokes
                                 State = ReaderState.ReadVertexes     ' we have read the key
                             End If
                         Case ReaderState.ReadVertexes
@@ -2037,7 +2048,7 @@ Public Class Form1
                                 State = ReaderState.Idle    ' blank line. End of glyph
                             Else
                                 Dim verts = Split(line, ";")    ' split line into vertexes
-                                Dim Stroke As New Stroke
+                                stroke = New Polyline2D
                                 For Each Vertex In verts
                                     Dim Coords = Split(Vertex, ",")    ' split into X,Y.   Could be X,Y or X,Y,Bulge
                                     Select Case Coords.Length
@@ -2052,20 +2063,16 @@ Public Class Form1
                                             Else
                                                 Throw New System.Exception($"Illegal data on line {LineNumber}: {line}")
                                             End If
-                                        Case 2 : Stroke.Vertices.Add(New Vertex(CDbl(Coords(0)), CDbl(Coords(1))))
+                                        Case 2 : stroke.Vertexes.Add(New Polyline2DVertex(CDbl(Coords(0)), CDbl(Coords(1))))
                                         Case 3
                                             ' Vertex has a bulge. Apply bulge to vector and add
                                             Dim bulge As Double = CDbl(Coords(2).Remove(0, 1))   ' remove the "A"
-                                            ' Generate points along the curve
-                                            Dim pathPoints() As Vertex = BulgePath.CalculateBulgePath(Stroke.Vertices.Last, New Vertex(CDbl(Coords(0)), CDbl(Coords(1))), bulge, 10)
-                                            For Each p In pathPoints
-                                                Stroke.Vertices.Add(New Vertex(p.X, p.Y))
-                                            Next
+                                            stroke.Vertexes.Add(New Polyline2DVertex(CDbl(Coords(0)), CDbl(Coords(1)), bulge))
                                         Case Else
                                             Throw New System.Exception($"Illegal number of coordinates ({Coords.Length} on line {LineNumber}: {line}")
                                     End Select
                                 Next
-                                Strokes.Add(Stroke)
+                                Strokes.Add(stroke)
                             End If
                     End Select
                 End While
@@ -2080,124 +2087,30 @@ Public Class Form1
     End Sub
 End Class
 
-
-Public Class BulgePath
-
-    ''' <summary>
-    ''' Calculates a quadratic Bézier curve with specified bulge
-    ''' </summary>
-    ''' <param name="startPoint">Starting point</param>
-    ''' <param name="endPoint">Ending point</param>
-    ''' <param name="bulgeHeight">Bulge height (positive for right/up, negative for left/down)</param>
-    ''' <param name="numPoints">Number of points to generate along the curve</param>
-    ''' <returns>Array of points along the curve</returns>
-    Public Shared Function CalculateBulgePath(startPoint As Vertex, endPoint As Vertex,
-                                             bulgeHeight As Double,
-                                             Optional numPoints As Integer = 100) As Vertex()
-        ' Step 1: Calculate the midpoint
-        Dim midpoint As New Vertex(
-            (startPoint.X + endPoint.X) / 2,
-            (startPoint.Y + endPoint.Y) / 2
-        )
-
-        ' Step 2: Calculate unit vector perpendicular to the line
-        Dim vectorX As Double = endPoint.X - startPoint.X
-        Dim vectorY As Double = endPoint.Y - startPoint.Y
-        Dim length As Double = Math.Sqrt(vectorX * vectorX + vectorY * vectorY)
-
-        ' Perpendicular unit vector (rotate 90 degrees)
-        Dim perpX As Double = vectorY / length
-        Dim perpY As Double = -vectorX / length
-
-        ' Step 3: Calculate control point
-        Dim controlPoint As New Vertex(
-                    midpoint.X + (3 * bulgeHeight) * perpX,
-                    midpoint.Y + (3 * bulgeHeight) * perpY
-                )
-
-        ' Generate points along the quadratic Bézier curve
-        Dim points(numPoints) As Vertex
-        For i As Integer = 0 To numPoints
-            Dim t As Double = i / numPoints
-            points(i) = CalculatePointOnCurve(startPoint, controlPoint, endPoint, t)
-        Next
-
-        Return points
-    End Function
-
-    ''' <summary>
-    ''' Calculates a single point on a quadratic Bézier curve
-    ''' </summary>
-    ''' <param name="p0">Start point</param>
-    ''' <param name="p1">Control point</param>
-    ''' <param name="p2">End point</param>
-    ''' <param name="t">Parameter (0 to 1)</param>
-    ''' <returns>Point on the curve</returns>
-    Private Shared Function CalculatePointOnCurve(p0 As Vertex, p1 As Vertex, p2 As Vertex, t As Double) As Vertex
-        Dim oneMinusT As Double = 1 - t
-
-        ' Quadratic Bézier formula: (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
-        Dim x As Double = (oneMinusT * oneMinusT * p0.X) +
-                          (2 * oneMinusT * t * p1.X) +
-                          (t * t * p2.X)
-
-        Dim y As Double = (oneMinusT * oneMinusT * p0.Y) +
-                          (2 * oneMinusT * t * p1.Y) +
-                          (t * t * p2.Y)
-
-        Return New Vertex(x, y)
-    End Function
-End Class
 Public Class Glyph
-    Public Property Strokes As List(Of Stroke)
+
+    ' A glyph is a single character made up of strokes
+    Public Property Strokes As List(Of Polyline2D)
     Public ReadOnly Property Width As Double
         Get
             Dim w As Double = 0
             For Each s In Strokes
-                For Each v In s.Vertices
-                    w = Math.Max(w, v.X)
+                For Each v In s.Vertexes
+                    w = Math.Max(w, v.Position.X)
                 Next
             Next
             Return w
         End Get
     End Property
     Public Sub New()
-        Me.Strokes = New List(Of Stroke)()
+        Me.Strokes = New List(Of Polyline2D)()
     End Sub
 
-    Public Sub New(strokes As List(Of Stroke))
+    Public Sub New(strokes As List(Of Polyline2D))
         Me.Strokes = strokes
     End Sub
 End Class
 
-Public Class Stroke
-    Public Property Vertices As List(Of Vertex)
-    Public Sub New()
-        Me.Vertices = New List(Of Vertex)()
-    End Sub
-    Public Sub New(vertices As List(Of Vertex))
-        Me.Vertices = vertices
-    End Sub
-End Class
-
-Public Class Vertex
-    ' A vertex in a stroke
-    Public Property X As Double
-    Public Property Y As Double
-    Public Sub New(x As Double, y As Double)
-        Me.X = x
-        Me.Y = y
-    End Sub
-
-    ' Test for equality
-    Public Shared Operator =(ByVal v1 As Vertex, v2 As Vertex) As Boolean
-        Return v1.X = v2.X AndAlso v1.Y = v2.Y
-    End Operator
-    ' Test for equality
-    Public Shared Operator <>(ByVal v1 As Vertex, v2 As Vertex) As Boolean
-        Return Not v1 = v2
-    End Operator
-End Class
 Public Class IntPoint
     Public Property X As Integer
     Public Property Y As Integer
