@@ -1888,7 +1888,7 @@ Public Class Form1
         Const RawFontSize = 9     ' the fonts are defined 9 units high
         Const LetterSpacing = 3       ' space between letters
         Dim Width As Double
-        Dim Strokes As New List(Of Polyline2D)
+        Dim Strokes As List(Of Polyline2D)
         Dim utf8Encoding As New System.Text.UTF8Encoding()
         Dim encodedString() As Byte
         Dim baseline As Integer = 0             ' X position of next character
@@ -1917,44 +1917,23 @@ Public Class Form1
         End With
 
         For Each ch In text
+            Dim x = Asc(ch)
             If ch = " " Then
                 Width = 0       ' no strokes for space
             Else
-                Strokes = FontData(Asc(ch)).Strokes      ' get list of strokes
+                Strokes = FontData(Asc(ch)).Strokes
+                Width = FontData(Asc(ch)).Width ' get width of this character
+                TranslateMatrix.M14 = baseline      ' move stroke to start of letter
                 For Each Stroke In Strokes
-                    ply = New Polyline2D    ' create polyline for this stroke
-                    For i = 0 To Stroke.Vertexes.Count - 1
-                        If Stroke.Vertexes(i).Bulge <> 0 Then
-                            ' segment has a bulge - generate a bulge
-                            Dim StartPoint = Stroke.Vertexes(i - 1).Position
-                            Dim Endpoint = Stroke.Vertexes(i).Position
-                            Dim arc = GenerateBulge(StartPoint, Endpoint, Stroke.Vertexes(i).Bulge)
-                            If arc.Vertexes(0).Position = Endpoint Then arc.Vertexes.Reverse()       ' the arc is reversed
-                            arc.Vertexes.RemoveAt(0)        ' the first vertex is the last of the previous line
-                            For v = 0 To arc.Vertexes.Count - 1
-                                ply.Vertexes.Add(arc.Vertexes(v))
-                            Next
-                        Else
-                            ply.Vertexes.Add(New Polyline2DVertex(Stroke.Vertexes(i).Position.X, Stroke.Vertexes(i).Position.Y))
-                        End If
-                    Next
-                    With TranslateMatrix
-                        .M14 = baseline
-                        .M24 = 0
-                    End With
-                    ply.TransformBy(TranslateMatrix)        ' move stroke to start of letter
+                    ply = Stroke.Clone          ' Create a polyline which is a deep copy of the data
+                    ply.TransformBy(TranslateMatrix)    ' move to correct position
                     result.Add(ply)             ' add to result
                 Next
-                Width = FontData(Asc(ch)).Width ' get width of this character (ignores bulge)
             End If
             baseline += Width + LetterSpacing       ' leave gap between characters
         Next
         ' Now transform result to account for scale, rotation, origin and alignment
         Dim offset As Double
-        ' remember the original origin
-        Dim m14 = TranslateMatrix.M14
-        Dim m24 = TranslateMatrix.M24
-
         Select Case alignment
             Case System.Windows.TextAlignment.Left
                 offset = 0      ' Nothing to do. Is left aligned
@@ -2010,7 +1989,7 @@ Public Class Form1
 
         Dim State As ReaderState = ReaderState.Idle
         Dim Strokes As List(Of Polyline2D) = Nothing
-        Dim stroke As Polyline2D
+        Dim stroke As Polyline2D, LastVertex As Polyline2DVertex
 
         Dim FontPath = My.Settings.FontPath
         If Not System.IO.Directory.Exists(FontPath) Then
@@ -2063,11 +2042,21 @@ Public Class Form1
                                             Else
                                                 Throw New System.Exception($"Illegal data on line {LineNumber}: {line}")
                                             End If
-                                        Case 2 : stroke.Vertexes.Add(New Polyline2DVertex(CDbl(Coords(0)), CDbl(Coords(1))))
+                                        Case 2
+                                            LastVertex = New Polyline2DVertex(New Polyline2DVertex(CDbl(Coords(0)), CDbl(Coords(1))))
+                                            stroke.Vertexes.Add(LastVertex)
                                         Case 3
                                             ' Vertex has a bulge. Apply bulge to vector and add
+                                            Dim StartPoint = LastVertex.Position
+                                            LastVertex = New Polyline2DVertex(New Polyline2DVertex(CDbl(Coords(0)), CDbl(Coords(1))))
+                                            Dim Endpoint = LastVertex.Position
                                             Dim bulge As Double = CDbl(Coords(2).Remove(0, 1))   ' remove the "A"
-                                            stroke.Vertexes.Add(New Polyline2DVertex(CDbl(Coords(0)), CDbl(Coords(1)), bulge))
+                                            Dim arc = GenerateBulge(StartPoint, Endpoint, bulge)
+                                            If arc.Vertexes(0).Position = Endpoint Then arc.Vertexes.Reverse()       ' the arc is reversed
+                                            arc.Vertexes.RemoveAt(0)        ' the first vertex is the last of the previous line
+                                            For Each v In arc.Vertexes
+                                                stroke.Vertexes.Add(v)      ' add arc to polyline
+                                            Next
                                         Case Else
                                             Throw New System.Exception($"Illegal number of coordinates ({Coords.Length} on line {LineNumber}: {line}")
                                     End Select
@@ -2077,7 +2066,22 @@ Public Class Form1
                     End Select
                 End While
                 fileReader.Close()
-                TextBox1.AppendText($"{FontData.Count} glyphs read from {FontPath}\{FontFile}{vbCrLf}")
+                'TextBox1.AppendText($"{FontData.Count} glyphs read from {FontPath}\{FontFile}{vbCrLf}")
+                'Dim MaxWidth = 0
+                'For Each glyph In FontData
+                '    Dim width = glyph.Value.Width
+                '    MaxWidth = Math.Max(MaxWidth, width)
+                '    Dim widstr = $"{width:f1}"
+                '    If (width > 11 Or width = 0) Then widstr = $"*** {widstr} ***"
+                '    TextBox1.AppendText($"{glyph.Key}(0x{glyph.Key:x})[{widstr}] = ")
+                '    For Each s In glyph.Value.Strokes
+                '        For Each v In s.Vertexes
+                '            TextBox1.AppendText($"({v.Position.X:f1},{v.Position.Y:f1}) ")
+                '        Next
+                '    Next
+                '    TextBox1.AppendText(vbCrLf)
+                'Next
+                'TextBox1.AppendText($"Maximum width is {MaxWidth:f1}{vbCrLf}")
             End If
         End If
     End Sub
@@ -2099,7 +2103,8 @@ Public Class Glyph
                     w = Math.Max(w, v.Position.X)
                 Next
             Next
-            Return w
+            Width = w
+            Exit Property
         End Get
     End Property
     Public Sub New()
