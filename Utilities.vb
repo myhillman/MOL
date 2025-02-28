@@ -93,7 +93,15 @@ Friend Module Utilities
         ' Given a vector startpoint, endpoint and bulge, create a Polyline2D representing the bulge points
         ' The arc will contain numpoints points, default 10
         Dim result As New Polyline2D
-        If bulge = 0 Or Math.Abs(bulge) > 1 Then Throw New System.Exception($"A bulge value of {bulge} is not valid")
+        Select Case Math.Abs(bulge)
+            Case Is <= 1
+                ' OK
+            Case Is <= 2
+                MsgBox($"A bulge value of {bulge} is very large.", vbAbort + vbOKOnly, "Warning: large bulge")
+            Case Else
+                MsgBox($"A bulge value of {bulge} is infeasibly large.", vbAbort + vbOKOnly, "Infeasible bulge")
+        End Select
+
         ' Item1=center, Item2=radius, Item3=StartAngle, Item4=EndAngle
         ' StartAngle and EndAngle are wrt to line joining StartPoint and EndPoint
 
@@ -101,7 +109,7 @@ Friend Module Utilities
         Dim StartAngleRad = DegToRad(arc.Item3)
         Dim EndAngleRad = DegToRad(arc.Item4)
         ' Ensure the angles are in the correct order
-        If EndAngleRad < StartAngleRad Then
+        If EndAngleRad <StartAngleRad Then
             EndAngleRad += 2 * Math.PI
         End If
         Dim angleIncrement = (EndAngleRad - StartAngleRad) / (numpoints - 1)

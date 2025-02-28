@@ -16,8 +16,10 @@ Public Class TestPanel
         My.Settings.PowerMax = CSng(tbPowerMax.Text)
         My.Settings.Engrave = CheckBox1.Checked
         My.Settings.FontPath = tbFontPath.Text
+        Dim FontChanged = (My.Settings.FontFile <> cbFontFile.Text)
         My.Settings.FontFile = cbFontFile.Text
         My.Settings.Save()
+        If FontChanged Then Form1.LoadFonts()
         Me.Close()
     End Sub
 
@@ -31,6 +33,7 @@ Public Class TestPanel
         With Me
             .tbMaterial.Text = My.Settings.Material
             .tbInterval.Text = My.Settings.Interval
+            .tbInterval.Enabled = My.Settings.Engrave    ' Interval only relevant for engraving
             .tbPasses.Text = My.Settings.Passes
             .tbSpeedMin.Text = My.Settings.SpeedMin
             .tbSpeedMax.Text = My.Settings.SpeedMax
@@ -39,6 +42,7 @@ Public Class TestPanel
             .CheckBox1.Checked = My.Settings.Engrave
             .tbFontPath.Text = My.Settings.FontPath
             ' Fill the list box
+            cbFontFile.Items.Clear()
             For Each foundFile As String In My.Computer.FileSystem.GetFiles(My.Settings.FontPath, FileIO.SearchOption.SearchTopLevelOnly, "*.lff")
                 Dim filename = Path.GetFileName(foundFile)
                 cbFontFile.Items.Add(filename)
@@ -81,7 +85,7 @@ Public Class TestPanel
             ErrorProvider1.SetError(sender, "Field must be an integer")
             Exit Sub
         End If
-        Const min = 1, max = 10
+        Const min = 1, max = 5
         If result < min Or result > max Then
             ErrorProvider1.SetError(sender, $"Value must be between {min} and {max}")
             e.Cancel = True
@@ -171,5 +175,9 @@ Public Class TestPanel
             My.Settings.FontPath = FolderBrowserDialog1.SelectedPath
         End If
 
+    End Sub
+
+    Private Sub CheckBox1_CheckedChanged(sender As Object, e As EventArgs) Handles CheckBox1.CheckedChanged
+        tbInterval.Enabled = Me.CheckBox1.Checked
     End Sub
 End Class

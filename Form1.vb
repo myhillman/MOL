@@ -9,16 +9,9 @@ Imports netDxf
 Imports netDxf.Entities
 Imports netDxf.Tables
 Imports Windows.Win32.System
-Imports YamlDotNet.Serialization
 Imports System.Text.RegularExpressions
-Imports System.Windows.Forms.Design.AxImporter
 Imports System.Text
-Imports MOL.Form1
-Imports System.DirectoryServices.ActiveDirectory
-Imports System.Text.Unicode
 Imports System.Windows.Ink
-Imports System.Windows.Media.Imaging
-Imports System.Windows.Forms.VisualStyles.VisualStyleElement.ToolTip
 
 ' Define the different block types
 Public Enum BLOCKTYPE
@@ -165,7 +158,6 @@ Public Class Form1
         Public Property Typ As Type       ' the type of the parameter
         Public Property Scale As Double    ' scale applied to value
         Public Property Units As String    ' the units of the value, e.g. mm
-
 
         Public Sub New(name As String, description As String, type As Type, Optional ByVal scale As Double = 1, Optional ByVal units As String = "")
             Me.Name = name
@@ -895,9 +887,16 @@ Public Class Form1
             Powers(i) = (My.Settings.PowerMax - My.Settings.PowerMin) / UBound(Powers) * i + My.Settings.PowerMin
         Next
 
-        Dim mode = IIf(My.Settings.Engrave, "ENG", "CUT")
+        Dim mode As String, IntervalStr As String
+        If My.Settings.Engrave Then
+            mode = "ENG"
+            IntervalStr = $"_{My.Settings.Interval:f1}"
+        Else
+            mode = "CUT"
+            IntervalStr = ""    ' Inverval is only relevant for engrave
+        End If
         ' Filename comprises ENG/CUT, Material, Interval & passes
-        Dim filename = $"TESTCARD_{mode}_{My.Settings.Material}_{My.Settings.Interval:f1}_{My.Settings.Passes}.MOL"     ' output file name
+        Dim filename = $"TESTCARD_{mode}_{My.Settings.Material}{IntervalStr}_{My.Settings.Passes}.MOL"     ' output file name
         writer = New BinaryWriter(System.IO.File.Open(filename, FileMode.Create), System.Text.Encoding.Unicode, False)
         dxf = New DxfDocument()     ' create empty DXF file
 
@@ -1026,7 +1025,7 @@ Public Class Form1
         WriteMOL(MOL_BEGSUBa, {4}, StartofBlock)    ' begin SUB
         UseMCBLK = True
         DrawText(writer, dxf, My.Settings.Material, System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + (Outline.Width / 2), -5), 3, 0)
-        DrawText(writer, dxf, $"Interval: {My.Settings.Interval} mm", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -9.5), 3, 0)
+        If My.Settings.Engrave Then DrawText(writer, dxf, $"Interval: {My.Settings.Interval} mm", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -9.5), 3, 0)  ' Interval only relevant for engrave
         DrawText(writer, dxf, $"Passes: { My.Settings.Passes}", System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + Outline.Width / 2, -14), 3, 0)
         ' Put labels on the axes
         For speed = 0 To speeds.Length - 1
@@ -1128,7 +1127,7 @@ Public Class Form1
     Public Sub MoveRelativeSplit(p As System.Windows.Point)
         MoveRelativeSplit(CType(p, IntPoint))       ' convert mm to steps
     End Sub
-    Public Sub MoveRelativeSplit(p As IntPoint)
+    Public Sub MoveRelativeSplit(delta As IntPoint)
         ' Create a move command from the current position to p
         ' Pieces = 2 or 3
         ' Accelerate before first one
@@ -1136,26 +1135,28 @@ Public Class Form1
         ' There may be a middle piece
         ' Phase 1 is slow, Phase 2 fast, phase 3 slow
         Dim moves As New List(Of IntPoint)
+
         ' Work out whether we can do a 2 part move, or it's too long and we need 3
+        If delta = ZERO Then Return     ' we're already there
         Dim Accel = IIf(LaserIsOn, WorkAcc, SpaceAcc)   ' Acceration difers if laser is on or not
         Dim T = (QuickSpeed - StartSpeed) / Accel       ' T =(max speed-initial speed)/acceleration time taken to reach QuickSpeed
         Dim S As Integer = CInt(StartSpeed * T + xScale * 0.5 * Accel * T ^ 2)  ' s=ut+0.5t*t  distance (steps) travelled whilst reaching this speed
         ' Calculate 2 or 3 part move
-        Dim Dist = Math.Sqrt(p.X ^ 2 + p.Y ^ 2)         ' distance to move
+        Dim Dist = Math.Sqrt(delta.X ^ 2 + delta.Y ^ 2)         ' distance to move
 
         If S > Dist / 2 Then
             ' we can get more than halfway if we needed, so 2 pieces enough
             ' We do it this way to avoid rounding errors
-            Dim delta1 = New IntPoint(p.X / 2, p.Y / 2)
+            Dim delta1 = New IntPoint(delta.X / 2, delta.Y / 2)
             moves.Add(delta1)
-            Dim delta2 = p - delta1
+            Dim delta2 = delta - delta1
             moves.Add(delta2)
         Else
             ' we can't make it halfway whilst accelerating, so will need to coast
             Dim ratio = S / Dist        ' percentage of accelerate/decelerate phases
-            Dim delta1 = New IntPoint(p.X * ratio, p.Y * ratio)
-            Dim delta2 = New IntPoint(p.X * (1 - 2 * ratio), p.Y * (1 - 2 * ratio))
-            Dim delta3 = p - delta1 - delta2
+            Dim delta1 = New IntPoint(delta.X * ratio, delta.Y * ratio)
+            Dim delta2 = New IntPoint(delta.X * (1 - 2 * ratio), delta.Y * (1 - 2 * ratio))
+            Dim delta3 = delta - delta1 - delta2
             moves.Add(delta1)       ' initial move
             moves.Add(delta2)       ' middle move
             moves.Add(delta3)       ' final move
@@ -1173,7 +1174,7 @@ Public Class Form1
             End If
             WriteMOL(MOL_MVREL, {772, moves(m).X, moves(m).Y})
         Next
-        position += p       ' update position
+        position += delta      ' update position
 
     End Sub
 
@@ -1790,17 +1791,6 @@ Public Class Form1
         Dim float = Leetro2Float(value)
         MsgBox($"The value of 0x{hex} as a Leetro float is {float}", vbInformation + vbOKOnly, "Conversion to float")
     End Sub
-
-    Private Sub CreateYAMLFileToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CreateYAMLFileToolStripMenuItem.Click
-
-        Dim serializer = New SerializerBuilder() _
-            .Build()
-
-        Dim yaml = serializer.Serialize(Commands)
-        TextBox1.AppendText($"{yaml}{vbCrLf}{vbCrLf}")
-
-    End Sub
-
     Enum ReaderState
         Idle
         ReadVertexes
@@ -1958,7 +1948,7 @@ Public Class Form1
         Next
         Return result
     End Function
-    Private Sub LoadFonts()
+    Friend Sub LoadFonts()
         ' Load LibreCAD single stoke font
 
         ' The LibreCAD font format is described below
@@ -2040,7 +2030,7 @@ Public Class Form1
                                                     Strokes.Add(s)   ' copy the character strokes
                                                 Next
                                             Else
-                                                Throw New System.Exception($"Illegal data on line {LineNumber}: {line}")
+                                                MsgBox($"Illegal data on line {LineNumber}: {line}. Font file {FontFile}, glyph {Key},0x{Key:x}", vbAbort + vbOKOnly, "Illegal glyph data")
                                             End If
                                         Case 2
                                             LastVertex = New Polyline2DVertex(New Polyline2DVertex(CDbl(Coords(0)), CDbl(Coords(1))))
@@ -2066,22 +2056,7 @@ Public Class Form1
                     End Select
                 End While
                 fileReader.Close()
-                'TextBox1.AppendText($"{FontData.Count} glyphs read from {FontPath}\{FontFile}{vbCrLf}")
-                'Dim MaxWidth = 0
-                'For Each glyph In FontData
-                '    Dim width = glyph.Value.Width
-                '    MaxWidth = Math.Max(MaxWidth, width)
-                '    Dim widstr = $"{width:f1}"
-                '    If (width > 11 Or width = 0) Then widstr = $"*** {widstr} ***"
-                '    TextBox1.AppendText($"{glyph.Key}(0x{glyph.Key:x})[{widstr}] = ")
-                '    For Each s In glyph.Value.Strokes
-                '        For Each v In s.Vertexes
-                '            TextBox1.AppendText($"({v.Position.X:f1},{v.Position.Y:f1}) ")
-                '        Next
-                '    Next
-                '    TextBox1.AppendText(vbCrLf)
-                'Next
-                'TextBox1.AppendText($"Maximum width is {MaxWidth:f1}{vbCrLf}")
+                TextBox1.AppendText($"Font with {FontData.Count} glyphs loaded from {FontPath}\{FontFile}{vbCrLf}")
             End If
         End If
     End Sub
@@ -2089,77 +2064,9 @@ Public Class Form1
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles Me.Load
         LoadFonts()
     End Sub
-End Class
 
-Public Class Glyph
-
-    ' A glyph is a single character made up of strokes
-    Public Property Strokes As List(Of Polyline2D)
-    Public ReadOnly Property Width As Double
-        Get
-            Dim w As Double = 0
-            For Each s In Strokes
-                For Each v In s.Vertexes
-                    w = Math.Max(w, v.Position.X)
-                Next
-            Next
-            Width = w
-            Exit Property
-        End Get
-    End Property
-    Public Sub New()
-        Me.Strokes = New List(Of Polyline2D)()
+    Private Sub ExitToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ExitToolStripMenuItem.Click
+        Application.Current.Shutdown()
+        End
     End Sub
-
-    Public Sub New(strokes As List(Of Polyline2D))
-        Me.Strokes = strokes
-    End Sub
-End Class
-
-Public Class IntPoint
-    Public Property X As Integer
-    Public Property Y As Integer
-
-    Public Sub New(ByVal x As Integer, ByVal y As Integer)
-        Me.X = x
-        Me.Y = y
-    End Sub
-    ' p1 + p2
-    Public Shared Operator +(ByVal p1 As IntPoint, p2 As IntPoint) As IntPoint
-        Return New IntPoint(p1.X + p2.X, p1.Y + p2.Y)
-    End Operator
-    ' p1 - p2
-    Public Shared Operator -(ByVal p1 As IntPoint, p2 As IntPoint) As IntPoint
-        Return New IntPoint(p1.X - p2.X, p1.Y - p2.Y)
-    End Operator
-    ' Test for equality
-    Public Shared Operator =(ByVal p1 As IntPoint, p2 As IntPoint) As Boolean
-        Return p1.X = p2.X AndAlso p1.Y = p2.Y
-    End Operator
-    ' Test for inequality
-    Public Shared Operator <>(ByVal p1 As IntPoint, p2 As IntPoint) As Boolean
-        Return Not p1 = p2
-    End Operator
-    ' Multiply by scaler
-    Public Shared Operator *(ByVal p1 As IntPoint, mult As Single) As IntPoint
-        Return New IntPoint(p1.X * mult, p1.Y * mult)
-    End Operator
-    ' Divide by scaler
-    Public Shared Operator /(ByVal p1 As IntPoint, mult As Single) As IntPoint
-        Return New IntPoint(p1.X / mult, p1.Y / mult)
-    End Operator
-
-    ' system.windows.point are in mm, IntPoint are in steps. Convert using scale
-    Public Shared Widening Operator CType(ByVal p1 As IntPoint) As System.Windows.Point
-        Return New System.Windows.Point(p1.X / Form1.xScale, p1.Y / Form1.yScale)
-    End Operator
-    ' system.windows.point are in mm, IntPoint are in steps. Convert using scale
-    Public Shared Widening Operator CType(ByVal p1 As System.Windows.Point) As IntPoint
-        Return New IntPoint(p1.X * Form1.xScale, p1.Y * Form1.yScale)
-    End Operator
-
-    ' Convert an IntPoint to a vector2 for DXF. Converted point is scaled to mm
-    Public Shared Widening Operator CType(ByVal p1 As IntPoint) As Vector2
-        Return New Vector2(p1.X / Form1.xScale, p1.Y / Form1.yScale)
-    End Operator
 End Class

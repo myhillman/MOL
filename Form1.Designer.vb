@@ -44,10 +44,9 @@ Partial Class Form1
         LineTestToolStripMenuItem = New ToolStripMenuItem()
         BoxTestToolStripMenuItem = New ToolStripMenuItem()
         ConvertLeetroToIEEEToolStripMenuItem = New ToolStripMenuItem()
-        CreateYAMLFileToolStripMenuItem = New ToolStripMenuItem()
+        FontTestToolStripMenuItem = New ToolStripMenuItem()
         TextBox1 = New TextBox()
         ProgressBar1 = New ProgressBar()
-        FontTestToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
@@ -148,7 +147,7 @@ Partial Class Form1
         ' 
         ' TestToolStripMenuItem
         ' 
-        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, CreateYAMLFileToolStripMenuItem, FontTestToolStripMenuItem})
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, FontTestToolStripMenuItem})
         TestToolStripMenuItem.Name = "TestToolStripMenuItem"
         TestToolStripMenuItem.Size = New Size(40, 20)
         TestToolStripMenuItem.Text = "Test"
@@ -189,11 +188,11 @@ Partial Class Form1
         ConvertLeetroToIEEEToolStripMenuItem.Size = New Size(244, 22)
         ConvertLeetroToIEEEToolStripMenuItem.Text = "Convert Leetro to IEEE"
         ' 
-        ' CreateYAMLFileToolStripMenuItem
+        ' FontTestToolStripMenuItem
         ' 
-        CreateYAMLFileToolStripMenuItem.Name = "CreateYAMLFileToolStripMenuItem"
-        CreateYAMLFileToolStripMenuItem.Size = New Size(244, 22)
-        CreateYAMLFileToolStripMenuItem.Text = "Create YAML file"
+        FontTestToolStripMenuItem.Name = "FontTestToolStripMenuItem"
+        FontTestToolStripMenuItem.Size = New Size(244, 22)
+        FontTestToolStripMenuItem.Text = "Font test"
         ' 
         ' TextBox1
         ' 
@@ -212,12 +211,6 @@ Partial Class Form1
         ProgressBar1.Name = "ProgressBar1"
         ProgressBar1.Size = New Size(1023, 21)
         ProgressBar1.TabIndex = 2
-        ' 
-        ' FontTestToolStripMenuItem
-        ' 
-        FontTestToolStripMenuItem.Name = "FontTestToolStripMenuItem"
-        FontTestToolStripMenuItem.Size = New Size(244, 22)
-        FontTestToolStripMenuItem.Text = "Font test"
         ' 
         ' Form1
         ' 
@@ -261,7 +254,6 @@ Partial Class Form1
     Friend WithEvents LineTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents BoxTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ConvertLeetroToIEEEToolStripMenuItem As ToolStripMenuItem
-    Friend WithEvents CreateYAMLFileToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents FontTestToolStripMenuItem As ToolStripMenuItem
 
 End Class
