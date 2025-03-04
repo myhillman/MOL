@@ -90,6 +90,8 @@ Public Class Form1
     Private QuickSpeed As Double = 300      ' Max speed when moving
     Private WorkAcc As Double = 500         ' Acceleration whilst cutting
     Private SpaceAcc As Double = 1200       ' Acceleration whilst just moving
+    Private ClipBoxPower As Integer = 40    ' power setting for Cut box
+    Private ClipBoxSpeed As Integer = 25    ' speed setting for Cut box
 
     Private position As IntPoint    ' current laser head position in mm
     Private LaserIsOn As Boolean = False        ' tracks state of laser
@@ -253,24 +255,6 @@ Public Class Form1
                             {New Parameter("z scale", "the Z scale", GetType(Double),, "steps/mm")}
                             }
                            )},
-        {MOL_PWRSPD5, New LASERcmd("PWRSPD5", "Not yet fully understood", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
-                            {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
-                            {New Parameter("Start cutter speed/speedmult", "", GetType(Double))},
-                            {New Parameter("Start cutter speed/speedmult", "", GetType(Double))},
-                            {New Parameter("Start cutter speed/speedmult", "", GetType(Double))}
-                            }
-                           )},
-        {MOL_PWRSPD7, New LASERcmd("PWRSPD7", "Not yet fully understood", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
-                            {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
-                            {New Parameter("Start cutter speed/speedmult", "", GetType(Double))},
-                            {New Parameter("Start cutter speed/speedmult", "", GetType(Double))},
-                            {New Parameter("Start cutter speed/speedmult", "", GetType(Double))},
-                            {New Parameter("Laser2 Corner Power", "", GetType(Int32), 0.01, "%")},
-                            {New Parameter("Laser2 Max Power", "", GetType(Int32), 0.01, "%")}
-                            }
-                           )},
         {MOL_ORIGIN, New LASERcmd("ORIGIN", "", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "", GetType(Int32))},
                             {New Parameter("x", "", GetType(Int32))},
@@ -299,11 +283,29 @@ Public Class Form1
                             }
                            )},
         {MOL_SETSPD, New LASERcmd("SETSPD", "Set min/max speed & acceleration", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("Initial speed", "", GetType(Double), 1 / xScale, "m/s")},
-                            {New Parameter("Max speed", "", GetType(Double), 1 / xScale, "m/s")},
-                            {New Parameter("Acceleration", "", GetType(Double), 1 / xScale, "m/s²")}
+                            {New Parameter("Initial speed", "", GetType(Double), 1 / xScale, "mm/s")},
+                            {New Parameter("Max speed", "", GetType(Double), 1 / xScale, "mm/s")},
+                            {New Parameter("Acceleration", "", GetType(Double), 1 / xScale, "mm/s²")}
                             }
                            )},
+        {MOL_PWRSPD5, New LASERcmd("PWRSPD5", "Not yet fully understood", ParameterCount.FIXED, New List(Of Parameter) From {
+                            {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
+                            {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
+                            {New Parameter("Start speed", "", GetType(Double), 1 / xScale, "mm/s")},
+                            {New Parameter("Max speed", "", GetType(Double), 1 / xScale, "mm/s")},
+                            {New Parameter("Unknown", "", GetType(Double))}
+                          }
+                         )},
+        {MOL_PWRSPD7, New LASERcmd("PWRSPD7", "Not yet fully understood", ParameterCount.FIXED, New List(Of Parameter) From {
+                            {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
+                            {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
+                            {New Parameter("Laser 2 Corner PWR", "", GetType(Int32), 0.01, "%")},
+                            {New Parameter("Laser 2 Max PWR", "", GetType(Int32), 0.01, "%")},
+                            {New Parameter("Start speed", "", GetType(Double), 1 / xScale, "mm/s")},
+                            {New Parameter("Max speed", "", GetType(Double), 1 / xScale, "mm/s")},
+                            {New Parameter("Unknown", "", GetType(Double))}
+                            }
+                         )},
         {MOL_LASER, New LASERcmd("LASER", "Laser on or off control", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("On/Off", "On or Off", GetType(OnOff_type))}})},
         {MOL_LASER1, New LASERcmd("LASER1", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(Int32))}})},
@@ -889,14 +891,15 @@ Public Class Form1
 
         Dim mode As String, IntervalStr As String
         If My.Settings.Engrave Then
-            mode = "ENG"
+            mode = "E"
             IntervalStr = $"_{My.Settings.Interval:f1}"
         Else
-            mode = "CUT"
+            mode = "C"
             IntervalStr = ""    ' Inverval is only relevant for engrave
         End If
-        ' Filename comprises ENG/CUT, Material, Interval & passes
-        Dim filename = $"TESTCARD_{mode}_{My.Settings.Material}{IntervalStr}_{My.Settings.Passes}.MOL"     ' output file name
+        ' Make filename for output. Restricted to 8.3 format
+        Dim filename = $"TC_{mode}{IntervalStr}.MOL"     ' output file name
+        If filename.IndexOf(".") > 7 Then Throw New Exception($"Filename {filename} is invalid. Not 8.3")
         writer = New BinaryWriter(System.IO.File.Open(filename, FileMode.Create), System.Text.Encoding.Unicode, False)
         dxf = New DxfDocument()     ' create empty DXF file
 
@@ -959,12 +962,11 @@ Public Class Form1
 
     Public Sub MakeTestBlock(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, layer As Layer)
         ' Make the test block
+        Const testSpeed = 180         ' speed when tracing TEST block
         position = New IntPoint(0, 0)       ' Layer starts at (0,0)
         WriteMOL(MOL_BEGSUBa, {1}, &H400)    ' begin SUB 1
         WriteMOL(&H80600148, {6, &H25B, &H91D4000, &HF13A300, &H1113A340, &H101D7A80, &HF716C00})   ' Unknown command
-        UseMCBLK = True
-        DrawBox(writer, dxf, outline, layer)
-        FlushMCBLK(False)
+        DrawBox(writer, dxf, outline, layer,,, testSpeed)
         WriteMOL(MOL_ENDSUB, {1})
         WriteMOL(MOL_END)
     End Sub
@@ -973,14 +975,14 @@ Public Class Form1
     ''' </summary>
     Public Sub MakeCutBlock(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, layer As Layer)
         position = New IntPoint(0, 0)       ' Layer starts at (0,0)
-        WriteMOL(MOL_BEGSUBa, {2}, &H600)    ' begin SUB 1
+        WriteMOL(MOL_BEGSUBa, {2}, &H600)    ' begin SUB 2
         WriteMOL(&H80600148, {6, &H25B, &H91D4000, &HF13A300, &H1113A340, &H101D7A80, &HF716C00})   ' Unknown command
-        WriteMOL(MOL_PWRSPD5, {4000, 4000, 629.0, 3149.0, 0.0})    ' set power & speed
+        WriteMOL(MOL_PWRSPD5, {ClipBoxPower * 100, ClipBoxPower * 100, ClipBoxSpeed * xScale, ClipBoxSpeed * xScale, 0.0})    ' set power & speed
         UseMCBLK = True
         Dim delta = CType(outline.BottomRight, IntPoint)     ' convert to steps
         DXF_line(position, position + delta, CutLayer)
-        MoveRelativeSplit(outline.BottomRight)  ' Move to start position in two goes
-        DrawBox(writer, dxf, outline, layer, False, 40, 25)
+        MoveRelativeSplit(outline.BottomRight, ClipBoxSpeed)  ' Move to start position in two goes
+        DrawBox(writer, dxf, outline, layer, False, ClipBoxPower, ClipBoxSpeed)
         FlushMCBLK(False)
         WriteMOL(MOL_ENDSUB, {2})
         WriteMOL(MOL_END)
@@ -1107,27 +1109,25 @@ Public Class Form1
     Public Sub FlushMCBLK(KeepOpen As Boolean)
         ' Flush the contents of the MCBLK.
         ' The state of UseMCBLK will be updated to KeepOpen when complete
-        If UseMCBLK Then
-            If MCBLK.Count > 0 Then
-                ' Disable MCBLK buffering
-                UseMCBLK = False
-                PutInt(MOL_MCBLK) : PutInt(MCBLK.Count)   ' write MCBLK command and count
-                ' Write the contents of the MCBLK
-                For Each item In MCBLK
-                    PutInt(item)
-                Next
-                MCBLK.Clear()          ' clear the buffer
-                MCBLKCount += 1                        ' count MCBLK
-            End If
-            UseMCBLK = KeepOpen       ' Turn MCBLK buffering back on
+        If MCBLK.Count > 0 Then
+            ' Disable MCBLK buffering
+            UseMCBLK = False
+            PutInt(MOL_MCBLK) : PutInt(MCBLK.Count)   ' write MCBLK command and count
+            ' Write the contents of the MCBLK
+            For Each item In MCBLK
+                PutInt(item)
+            Next
+            MCBLK.Clear()          ' clear the buffer
+            MCBLKCount += 1                        ' count MCBLK
         End If
+        UseMCBLK = KeepOpen       ' Turn MCBLK buffering back on
     End Sub
 
 
-    Public Sub MoveRelativeSplit(p As System.Windows.Point)
-        MoveRelativeSplit(CType(p, IntPoint))       ' convert mm to steps
+    Public Sub MoveRelativeSplit(p As System.Windows.Point, speed As Double)
+        MoveRelativeSplit(CType(p, IntPoint), speed)       ' convert mm to steps
     End Sub
-    Public Sub MoveRelativeSplit(delta As IntPoint)
+    Public Sub MoveRelativeSplit(delta As IntPoint, speed As Double)
         ' Create a move command from the current position to p
         ' Pieces = 2 or 3
         ' Accelerate before first one
@@ -1139,12 +1139,12 @@ Public Class Form1
         ' Work out whether we can do a 2 part move, or it's too long and we need 3
         If delta = ZERO Then Return     ' we're already there
         Dim Accel = IIf(LaserIsOn, WorkAcc, SpaceAcc)   ' Acceration difers if laser is on or not
-        Dim T = (QuickSpeed - StartSpeed) / Accel       ' T =(max speed-initial speed)/acceleration time taken to reach QuickSpeed
+        Dim T = (speed - StartSpeed) / Accel       ' T =(max speed-initial speed)/acceleration time taken to reach QuickSpeed
         Dim S As Integer = CInt(StartSpeed * T + xScale * 0.5 * Accel * T ^ 2)  ' s=ut+0.5t*t  distance (steps) travelled whilst reaching this speed
         ' Calculate 2 or 3 part move
         Dim Dist = Math.Sqrt(delta.X ^ 2 + delta.Y ^ 2)         ' distance to move
 
-        If S > Dist / 2 Then
+        If S > Dist / 2 Or Not LaserIsOn Then
             ' we can get more than halfway if we needed, so 2 pieces enough
             ' We do it this way to avoid rounding errors
             Dim delta1 = New IntPoint(delta.X / 2, delta.Y / 2)
@@ -1165,12 +1165,12 @@ Public Class Form1
         For m = 0 To moves.Count - 1
             If m = 0 Then    ' the first one
                 WriteMOL(MOL_ACCELERATION, {Acceleration_type.Accelerate})
-                WriteMOL(MOL_SETSPD, {StartSpeed * xScale, QuickSpeed * xScale, Accel * xScale})
+                WriteMOL(MOL_SETSPD, {StartSpeed * xScale, speed * xScale, Accel * xScale})
             ElseIf m = moves.Count - 1 Then    ' the last one
                 WriteMOL(MOL_ACCELERATION, {Acceleration_type.Decelerate})
-                WriteMOL(MOL_SETSPD, {StartSpeed * xScale, QuickSpeed * xScale, Accel * xScale})
+                WriteMOL(MOL_SETSPD, {StartSpeed * xScale, speed * xScale, Accel * xScale})
             Else
-                WriteMOL(MOL_SETSPD, {QuickSpeed * xScale, QuickSpeed * xScale, Accel * xScale})     ' Quick speed in the middle section
+                WriteMOL(MOL_SETSPD, {speed * xScale, speed * xScale, Accel * xScale})     ' Quick speed in the middle section
             End If
             WriteMOL(MOL_MVREL, {772, moves(m).X, moves(m).Y})
         Next
@@ -1178,7 +1178,7 @@ Public Class Form1
 
     End Sub
 
-    Public Sub DrawBox(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, Layer As Layer, Optional shaded As Boolean = False, Optional power As Integer = 0, Optional speed As Integer = 0)
+    Public Sub DrawBox(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, Layer As Layer, Optional shaded As Boolean = False, Optional power As Integer = 0, Optional speed As Double = 300)
         ' Draw a box
         ' outline is a rect defining the box in steps
         ' power as %
@@ -1209,19 +1209,24 @@ Public Class Form1
             ' MOL commands
             If delta <> ZERO Then
                 DXF_line(position, position + delta, MoveLayer)
-                MoveRelativeSplit(delta)        ' Move to start of box (BottomRight) in 2 pieces
+                MoveRelativeSplit(delta, QuickSpeed)        ' Move to start of box (BottomRight) in 2 pieces
             End If
-            'WriteMOL(MOL_pwrspd,{})
+            WriteMOL(MOL_PWRSPD5, {power * 100, power * 100, 5 * xScale, speed * xScale, 0.0})    ' set power & speed
+            UseMCBLK = True     ' open MCB
+            WriteMOL(&H1000B06, {&H201})        ' Unknown magic command
             ' Ordinary box with 4 sides
-            If power > 0 Or speed > 0 Then
+            If power > 0 Then      ' laser on if not TEST box
                 WriteMOL(MOL_LASER, {OnOff_type.[On]})
                 LaserIsOn = True
             End If
-            MoveRelativeSplit(New System.Windows.Point(-outline.Width, 0))
-            MoveRelativeSplit(New System.Windows.Point(0, -outline.Height))
-            MoveRelativeSplit(New System.Windows.Point(outline.Width, 0))
-            MoveRelativeSplit(New System.Windows.Point(0, outline.Height))
-            If power > 0 Or speed > 0 Then WriteMOL(MOL_LASER, {OnOff_type.Off}) : LaserIsOn = False
+            MoveRelativeSplit(New System.Windows.Point(-outline.Width, 0), speed)
+            MoveRelativeSplit(New System.Windows.Point(0, -outline.Height), speed)
+            MoveRelativeSplit(New System.Windows.Point(outline.Width, 0), speed)
+            MoveRelativeSplit(New System.Windows.Point(0, outline.Height), speed)
+            If LaserIsOn Then WriteMOL(MOL_LASER, {OnOff_type.Off}) : LaserIsOn = False     ' Turn laser off
+            FlushMCBLK(False)       ' close MCB
+            WriteMOL(&H1000B06, {&H200})        ' Unknown magic command
+            WriteMOL(&H1000B06, {&H200})        ' Unknown magic command
             ' DXF commands
             ' draw 4 lines surrounding the cell
             Dim x1 = outline.Right, x2 = outline.Left, y1 = outline.Bottom, y2 = outline.Top
@@ -1257,7 +1262,7 @@ Public Class Form1
             delta -= deltaacd
             ' Move to start of engraving
             DXF_line(position, position + delta, MoveLayer)     ' move to start
-            MoveRelativeSplit(delta)
+            MoveRelativeSplit(delta, speed)
             WriteMOL(MOL_LASER1, {2})     ' turn laser on engrave mode?
             Dim Steps As OnOffSteps                 ' construct steps as on for cellwidth, and off for 0
             Steps.OnSteps = outline.Width * xScale
@@ -1295,12 +1300,14 @@ Public Class Form1
     Public Sub DrawText(writer As BinaryWriter, dxf As DxfDocument, text As String, alignment As System.Windows.TextAlignment, origin As System.Windows.Point, fontsize As Double, angle As Double)
         ' Write some text at specified size, position and angle
 
+        Const TextSpeed = 40      ' speed for text
+        Const TextPower = 40      ' % power for text
+
         Dim Strokes = DisplayString(text, alignment, origin, fontsize, angle)       ' Convert the text to strokes
         Dim shading = PowerSpeedColor(My.Settings.PowerMax / 2, My.Settings.SpeedMax / 2)      ' use 50% power and speed for text
 
         ' draw the text
         ' DXF first
-        UseMCBLK = True
         ' First render each stroke to DXF
         For Each stroke In Strokes
             stroke.Color = shading
@@ -1316,6 +1323,7 @@ Public Class Form1
             .M31 = 0 : .M32 = 0 : .M33 = 1 : .M34 = 0
             .M41 = 0 : .M42 = 0 : .M43 = 0 : .M44 = 1
         End With
+        UseMCBLK = True
         For Each stroke In Strokes
             stroke.TransformBy(matrix)    ' convert mm data to steps
             ' if this is the first figure in SUBR 4, record in StartPosns
@@ -1327,22 +1335,22 @@ Public Class Form1
                 position = StartPoint     ' position will be StartPoint when subr executes
             End If
 
-            '
+            ' Set speed and power for text
+            WriteMOL(MOL_PWRSPD5, {TextPower * 100, TextPower * 100, TextSpeed * xScale, TextSpeed * xScale, 0.0})    ' set power & speed
             ' Get to the start position of this stroke
             Dim delta As IntPoint = StartPoint - position
             If delta <> ZERO Then
                 DXF_line(position, position + delta, MoveLayer)
-                MoveRelativeSplit(delta)      ' move in 2 segments
+                MoveRelativeSplit(delta, TextSpeed)      ' move in 2 segments
             End If
             WriteMOL(MOL_LASER, {OnOff_type.[On]})
             ' Process all vertexes, except the first
             For p = 1 To stroke.Vertexes.Count - 1
                 Dim thispoint = New IntPoint(stroke.Vertexes(p).Position.X, stroke.Vertexes(p).Position.Y)
                 delta = thispoint - position
-                MoveRelativeSplit(delta)          ' draw stroke
+                MoveRelativeSplit(delta, TextSpeed)          ' draw stroke
             Next
             WriteMOL(MOL_LASER, {OnOff_type.Off})
-
         Next
         FlushMCBLK(False)
     End Sub
@@ -1500,7 +1508,6 @@ Public Class Form1
             For Each s In SubrAddrs
                 TextBox1.AppendText($"{s.Key}: {s.Value:x}{vbCrLf}")
             Next
-
         End With
     End Sub
 
