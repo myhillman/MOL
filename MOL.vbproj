@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="GemBox.Spreadsheet" Version="2025.2.109" />
     <PackageReference Include="netDxf" Version="2023.11.10" />
   </ItemGroup>
 

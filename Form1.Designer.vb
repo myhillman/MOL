@@ -30,7 +30,7 @@ Partial Class Form1
         TestCardParametersToolStripMenuItem = New ToolStripMenuItem()
         DXFMetricsToolStripMenuItem = New ToolStripMenuItem()
         ReconstructMINIMARIOMOLToolStripMenuItem = New ToolStripMenuItem()
-        CommandSummaryToolStripMenuItem = New ToolStripMenuItem()
+        CommandSpreadsheetToolStripMenuItem = New ToolStripMenuItem()
         ExitToolStripMenuItem = New ToolStripMenuItem()
         DebugToolStripMenuItem = New ToolStripMenuItem()
         HEXDUMPONToolStripMenuItem = New ToolStripMenuItem()
@@ -61,7 +61,7 @@ Partial Class Form1
         ' 
         ' OpenToolStripMenuItem
         ' 
-        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {DisassembleToolStripMenuItem, RenderToolStripMenuItem, MakeTestCardToolStripMenuItem, TestCardParametersToolStripMenuItem, DXFMetricsToolStripMenuItem, ReconstructMINIMARIOMOLToolStripMenuItem, CommandSummaryToolStripMenuItem, ExitToolStripMenuItem})
+        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {DisassembleToolStripMenuItem, RenderToolStripMenuItem, MakeTestCardToolStripMenuItem, TestCardParametersToolStripMenuItem, DXFMetricsToolStripMenuItem, ReconstructMINIMARIOMOLToolStripMenuItem, CommandSpreadsheetToolStripMenuItem, ExitToolStripMenuItem})
         OpenToolStripMenuItem.Name = "OpenToolStripMenuItem"
         OpenToolStripMenuItem.Size = New Size(37, 20)
         OpenToolStripMenuItem.Text = "File"
@@ -102,11 +102,11 @@ Partial Class Form1
         ReconstructMINIMARIOMOLToolStripMenuItem.Size = New Size(233, 22)
         ReconstructMINIMARIOMOLToolStripMenuItem.Text = "Reconstruct MINIMARIO.MOL"
         ' 
-        ' CommandSummaryToolStripMenuItem
+        ' CommandSpreadsheetToolStripMenuItem
         ' 
-        CommandSummaryToolStripMenuItem.Name = "CommandSummaryToolStripMenuItem"
-        CommandSummaryToolStripMenuItem.Size = New Size(233, 22)
-        CommandSummaryToolStripMenuItem.Text = "Command summary"
+        CommandSpreadsheetToolStripMenuItem.Name = "CommandSpreadsheetToolStripMenuItem"
+        CommandSpreadsheetToolStripMenuItem.Size = New Size(233, 22)
+        CommandSpreadsheetToolStripMenuItem.Text = "Command Spreadsheet"
         ' 
         ' ExitToolStripMenuItem
         ' 
@@ -248,12 +248,12 @@ Partial Class Form1
     Friend WithEvents TextTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents DXFMetricsToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ReconstructMINIMARIOMOLToolStripMenuItem As ToolStripMenuItem
-    Friend WithEvents CommandSummaryToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents DisassembleToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents RenderToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents LineTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents BoxTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ConvertLeetroToIEEEToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents FontTestToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents CommandSpreadsheetToolStripMenuItem As ToolStripMenuItem
 
 End Class

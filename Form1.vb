@@ -12,6 +12,8 @@ Imports Windows.Win32.System
 Imports System.Text.RegularExpressions
 Imports System.Text
 Imports System.Windows.Ink
+Imports GemBox.Spreadsheet
+
 
 ' Define the different block types
 Public Enum BLOCKTYPE
@@ -33,6 +35,7 @@ End Enum
 Friend Enum OnOff_type
     Off = 0
     [On] = 1
+    Engrave = 2
 End Enum
 
 Friend Enum Axis_type
@@ -56,7 +59,7 @@ End Enum
 End Structure
 
 Public Class Form1
-    Private Const BLOCK_SIZE = 512          ' MOL is divided into blocks or chunks
+    Private Const BLOCK_SIZE = 512          ' 4-byte words. MOL is divided into blocks or chunks
     Private debugflag As Boolean = True
     Private hexdump As Boolean = False
     Private dlg = New OpenFileDialog
@@ -82,7 +85,6 @@ Public Class Form1
     Private Const MCBLKMax = 508                           ' maximum words in a MCBLK
     Private ChunksWithCode As New Dictionary(Of Integer, Boolean)      ' list of chunks known to contain code. Boolean is true if has been executed
     Private FontData As New Dictionary(Of Integer, Glyph)       ' stroke fonts
-
 
     ' Variables that reflect the state of the laser cutter
     ' These parameters from Machine Options - Worktable dialog
@@ -111,6 +113,7 @@ Public Class Form1
     Private EngPower As Integer             ' Engrave power (%)
     Private EngSpeed As Double              ' Engrave speed (mm/s)
     Private MVRELInConfig As Integer      ' number of MVREL encountered so far in CONFIG section
+    Private MCBLKCounter As Integer = 0     ' counter when inside MCBLK
 
     ' Define some layers for DXF file
     Private TextLayer As New Layer("Text") With {       ' text
@@ -211,6 +214,7 @@ Public Class Form1
     Private Const MOL_LASER2 = &H1000806
     Private Const MOL_LASER3 = &H1000846
     Private Const MOL_GOSUB = &H1500048
+    Private Const MOL_GOSUBb = &H80500008
     Private Const MOL_GOSUB3 = &H3500048
     Private Const MOL_X5_FIRST = &H200548
     Private Const MOL_X6_LAST = &H200648
@@ -288,7 +292,7 @@ Public Class Form1
                             {New Parameter("Acceleration", "", GetType(Double), 1 / xScale, "mm/s²")}
                             }
                            )},
-        {MOL_PWRSPD5, New LASERcmd("PWRSPD5", "Not yet fully understood", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_PWRSPD5, New LASERcmd("PWRSPD5", "Set Power & Speed", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Start speed", "", GetType(Double), 1 / xScale, "mm/s")},
@@ -296,7 +300,7 @@ Public Class Form1
                             {New Parameter("Unknown", "", GetType(Double))}
                           }
                          )},
-        {MOL_PWRSPD7, New LASERcmd("PWRSPD7", "Not yet fully understood", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_PWRSPD7, New LASERcmd("PWRSPD7", "Set Power & Speed (2 heads)", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Laser 2 Corner PWR", "", GetType(Int32), 0.01, "%")},
@@ -315,10 +319,15 @@ Public Class Form1
                             {New Parameter("n", "Number of the subroutine", GetType(Int32))}
                             }
                            )},
-        {MOL_GOSUB3, New LASERcmd("GOSUB3", "", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("n", "", GetType(Int32))},
-                            {New Parameter("x", "", GetType(Double))},
-                            {New Parameter("y", "", GetType(Double))}
+        {MOL_GOSUBb, New LASERcmd("GOSUBb", "Begin of subroutine", ParameterCount.VARIABLE, New List(Of Parameter) From {
+                        {New Parameter("n", "Subroutine number", GetType(Int32))},
+                        {New Parameter("x", "x value", GetType(Double))},
+                        {New Parameter("y", "y value", GetType(Double))}}
+                        )},
+        {MOL_GOSUB3, New LASERcmd("GOSUB3", "Call subroutine with 3 parameters", ParameterCount.FIXED, New List(Of Parameter) From {
+                            {New Parameter("n", "Number of the subroutine", GetType(Int32))},
+                            {New Parameter("x", "x parameter", GetType(Double))},
+                            {New Parameter("y", "y parameter", GetType(Double))}
                             }
                            )},
         {MOL_X5_FIRST, New LASERcmd("X5_FIRST", "", ParameterCount.FIXED)},
@@ -333,7 +342,7 @@ Public Class Form1
                             {New Parameter("y", "", GetType(Double))}
                             }
                            )},
-        {MOL_ACCELERATION, New LASERcmd("ACCELERATION", "Accelerate or Deccelerate", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Acceleration", "", GetType(Acceleration_type))}})},
+        {MOL_ACCELERATION, New LASERcmd("ACCELERATION", "Accelerate or Decelerate", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Acceleration", "", GetType(Acceleration_type))}})},
         {MOL_BLWR, New LASERcmd("BLWR", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_type))}})},
         {MOL_BLWRa, New LASERcmd("BLWRa", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_type))}})},
         {MOL_ENGPWR, New LASERcmd("ENGPWR", "Engrave Power", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Engrave power", "", GetType(Integer), 0.01, "%")}})},
@@ -359,7 +368,7 @@ Public Class Form1
                 {New Parameter("Axis", "", GetType(Axis_type))},
                 {New Parameter("dy", "Distance to move", GetType(Integer), 1 / yScale, "mm")}}
         )},
-        {MOL_ENGACD, New LASERcmd("ENGACD", "Engraving (Ac)(De)cceleration distance", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_ENGACD, New LASERcmd("ENGACD", "Engraving (Ac)(De)celeration distance", ParameterCount.FIXED, New List(Of Parameter) From {
                     {New Parameter("x", "distance", GetType(Int32), 1 / xScale, "mm")}}
                     )},
         {MOL_ENGLSR, New LASERcmd("ENGLSR", "Engraving On/Off pattern", ParameterCount.VARIABLE, New List(Of Parameter) From {
@@ -500,18 +509,21 @@ Public Class Form1
         End If      ' We are done
         cmd_len = cmd >> 24 And &HFF
         If cmd_len = &H80 Then
-            cmd_len = GetInt() And &HFF
+            cmd_len = GetInt() And &H1FF
         End If
         Select Case cmd
             Case MOL_MCBLK
+                MCBLKCounter = cmd_len                  ' size of MCBLK in words
                 cmd_len = 1        ' allow contents of MCBLK to decode
                 reader.BaseStream.Position = cmdBegin + 4     ' backup so we can read length as parameter
         End Select
 
+        If MCBLKCounter > 0 And cmd <> MOL_MCBLK Then writer.Write(" >")     ' prefix MCBLK with indicator
         If Commands.TryGetValue(cmd, value) Then
             If value.ParameterType = ParameterCount.FIXED And cmd_len <> value.Parameters.Count And cmd <> MOL_MCBLK Then
                 Throw New System.Exception($"Command {value.Mnemonic}: length is {cmd_len}, but data table says {value.Parameters.Count}")
             End If
+
             writer.Write($" {value.Mnemonic}")
             For Each p In value.Parameters
                 writer.Write($" {p.Name}=")
@@ -535,7 +547,7 @@ Public Class Form1
             Next
         Else
             ' UNKNOWN command. Just show parameters
-            writer.Write($"Unknown: {cmd:x8} Params {cmd_len}: ")
+            writer.Write($" Unknown: {cmd:x8} Params {cmd_len}: ")
             For i = 1 To cmd_len
                 Dim n As Integer = GetInt()
                 writer.Write($" {n:x8}")
@@ -543,6 +555,7 @@ Public Class Form1
         End If
         writer.WriteLine()
         'reader.BaseStream.Seek(cmdBegin + cmd_len * 4 + 4, 0)       ' move to next command
+        If cmd <> MOL_MCBLK Then MCBLKCounter -= (cmd_len + 1)
         Return True         ' more commands follow
     End Function
 
@@ -892,14 +905,14 @@ Public Class Form1
         Dim mode As String, IntervalStr As String
         If My.Settings.Engrave Then
             mode = "E"
-            IntervalStr = $"_{My.Settings.Interval:f1}"
+            IntervalStr = $"_{CInt(My.Settings.Interval * 10)}"       ' interval in 0.1 mm units
         Else
             mode = "C"
             IntervalStr = ""    ' Inverval is only relevant for engrave
         End If
         ' Make filename for output. Restricted to 8.3 format
         Dim filename = $"TC_{mode}{IntervalStr}.MOL"     ' output file name
-        If filename.IndexOf(".") > 7 Then Throw New Exception($"Filename {filename} is invalid. Not 8.3")
+        If filename.IndexOf("."c) > 7 Then Throw New Exception($"Filename {filename} is invalid. Not 8.3")
         writer = New BinaryWriter(System.IO.File.Open(filename, FileMode.Create), System.Text.Encoding.Unicode, False)
         dxf = New DxfDocument()     ' create empty DXF file
 
@@ -998,7 +1011,6 @@ Public Class Form1
         WriteMOL(MOL_BEGSUBa, {3}, StartofBlock)    ' begin SUB 
         WriteMOL(&H1000D46, {&HBB8})         ' unknown command
 
-
         Dim cellsize = New Size(outline.Width / 10, outline.Height / 10)    ' there are 10 x 10 cells 
 
         ' Now create the engraved box for each setting
@@ -1014,6 +1026,8 @@ Public Class Form1
                 WriteMOL(MOL_LASER, {OnOff_type.Off})    ' turn laser off
             Next
         Next
+        WriteMOL(&H1000B46, {&H200})         ' unknown command
+        WriteMOL(&H1000B46, {&H200})         ' unknown command
         WriteMOL(MOL_ENDSUB, {3})    ' end SUB 
         WriteMOL(MOL_END)
     End Sub
@@ -1268,8 +1282,12 @@ Public Class Form1
             Steps.OnSteps = outline.Width * xScale
             Steps.OffSteps = 0
             WriteMOL(MOL_ENGACD, {engacd})     ' define the acceleration start distance
-            WriteMOL(MOL_ENGPWR, {power * 100})             ' define power
+            WriteMOL(&H1000246, {0})            ' unknown
             WriteMOL(MOL_ENGSPD, {Axis_type.X, speed * xScale})          ' define speed
+            WriteMOL(&H2010041, {3, &HB6C3000})     ' unknown
+            WriteMOL(MOL_PWRSPD5, {power * 100, power * 100, 0.0, speed * xScale, 0.0})
+            WriteMOL(MOL_ENGPWR, {power * 100})             ' define power
+            WriteMOL(&H1000B46, {&H201})                    ' unknown
             Dim OnOffTotal As Integer = engacd * 2 + Steps.OnSteps + Steps.OffSteps
             Dim OnOffOnly As Integer = Steps.OnSteps + Steps.OffSteps   ' only on/off step distance
             Dim direction As Integer = 1        ' moving L to R
@@ -1548,7 +1566,7 @@ Public Class Form1
         My.Computer.FileSystem.WriteAllBytes("minimario.MOL", bytes, False)
     End Sub
 
-    Private Sub CommandSummaryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CommandSummaryToolStripMenuItem.Click
+    Private Sub CommandSummaryToolStripMenuItem_Click(sender As Object, e As EventArgs)
         ' produce a summary of all command
         TextBox1.AppendText($"Command summary{vbCrLf}{vbCrLf}")
         TextBox1.AppendText($"{"HEX value",-12}{"Mnemonic",-15}  Parameters (name is type){vbCrLf}")
@@ -1579,7 +1597,7 @@ Public Class Form1
         TextBox1.AppendText($"{vbCrLf}Custom types{vbCrLf}")
         For Each ct In CustomTypes
             Dim enums As New List(Of String)
-            For Each value In System.Enum.GetValues(ct)     ' extract name and value of type
+            For Each value In [Enum].GetValues(ct)     ' extract name and value of type
                 Dim name = value.ToString
                 Dim valu = CInt(value).ToString
                 enums.Add($"{name}={valu}")
@@ -1608,9 +1626,9 @@ Public Class Form1
             ' DISASSEMBLE everything
             TextFile.WriteLine($"Disassembly of {dlg.filename} on {Now}")
             DisplayHeader(TextFile)
-            DecodeStream(TextFile, BLOCKTYPE.CONFIG, BLOCKTYPE.CONFIG * BLOCK_SIZE)
-            DecodeStream(TextFile, BLOCKTYPE.TEST, BLOCKTYPE.TEST * BLOCK_SIZE)
-            DecodeStream(TextFile, BLOCKTYPE.CUT, BLOCKTYPE.CUT * BLOCK_SIZE)
+            DecodeStream(TextFile, BLOCKTYPE.CONFIG, ConfigChunk * BLOCK_SIZE)
+            DecodeStream(TextFile, BLOCKTYPE.TEST, TestChunk * BLOCK_SIZE)
+            DecodeStream(TextFile, BLOCKTYPE.CUT, CutChunk * BLOCK_SIZE)
             For Each chunk In DrawChunks
                 DecodeStream(TextFile, BLOCKTYPE.DRAW, chunk * BLOCK_SIZE)
             Next
@@ -1761,19 +1779,52 @@ Public Class Form1
 
     Public Sub Initialise()
         ' Initialise all variables
-        ' Setup some start positions
+
+        stream = Nothing
+        reader = Nothing
+        writer = Nothing
+        TopRight = New IntPoint(0, 0)
+        BottomLeft = New IntPoint(0, 0)
+        startposn = New IntPoint(0, 0)
+        delta = New IntPoint(0, 0)
+        ZERO = New IntPoint(0, 0)
+        position = ZERO
+        CommandUsage.Clear()
+        StepsArray = Nothing
+        Stack.Clear()
+        layer = Nothing
+        MCBLK.Clear()
+        UseMCBLK = False
+        MCBLKCount = 0
+        MVRELCnt = 0
+        ChunksWithCode.Clear()
+        FontData.Clear()
+        position = ZERO
+        LaserIsOn = False
+        AccelLength = 0
+        CurrentSubr = 0
         StartPosns.Clear()
+        SubrAddrs.Clear()
+        ConfigChunk = 0
+        TestChunk = 0
+        CutChunk = 0
+        DrawChunks.Clear()
+        ENGLSRsteps.Clear()
+        FirstMove = True
+        EngPower = 0
+        EngSpeed = 0
+        MVRELInConfig = 0
+        MCBLKCounter = 0
+        TextBox1.Clear()
         DrawChunks.Clear()
         ' Create initial start positions
         SubrAddrs.Clear()
         ' Subr 1 & 2 are TEST & CUT
+        ' Setup some start positions
+        StartPosns.Clear()
         StartPosns.Add(1, (True, New IntPoint(0, 0)))
         StartPosns.Add(2, (True, New IntPoint(0, 0)))
-        position = ZERO
         ChunksWithCode.Clear()
-
-        TextBox1.Clear()
-
     End Sub
     Private Sub BoxTestToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles BoxTestToolStripMenuItem.Click
         writer = New BinaryWriter(System.IO.File.Open("BoxTest.bin", FileMode.Create), System.Text.Encoding.Unicode, False)
@@ -2025,6 +2076,7 @@ Public Class Form1
                             Else
                                 Dim verts = Split(line, ";")    ' split line into vertexes
                                 stroke = New Polyline2D
+                                LastVertex = Nothing        ' just to supress a warning
                                 For Each Vertex In verts
                                     Dim Coords = Split(Vertex, ",")    ' split into X,Y.   Could be X,Y or X,Y,Bulge
                                     Select Case Coords.Length
@@ -2076,4 +2128,92 @@ Public Class Form1
         Application.Current.Shutdown()
         End
     End Sub
+
+    Private Sub CommandSpreadsheetToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CommandSpreadsheetToolStripMenuItem.Click
+        ' Produce formatted list of commands in spreadsheet
+        SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
+        Dim workbook As New ExcelFile
+        Dim worksheet = workbook.Worksheets.Add("Commands")
+
+        Dim HorizCenteredStyle = New CellStyle With {
+            .HorizontalAlignment = HorizontalAlignmentStyle.Center
+        }
+        Dim VertCenteredStyle = New CellStyle With {
+            .VerticalAlignment = VerticalAlignmentStyle.Center
+        }
+        ' Do Header
+        Dim row = 0
+        Dim col = 0
+        For Each h In {"Code", "Mnemonic", "Description", "Parameters"}
+            worksheet.Cells(row, col).Value = h
+            col += 1
+        Next
+        ' Second row of header
+        row = 1
+        col = 3
+        For Each h In {"#", "Description", "Name", "Type", "Scale", "Units"}
+            worksheet.Cells(row, col).Value = h
+            col += 1
+        Next
+        With worksheet.Cells.GetSubrange("D1:I1")
+            .Merged = True  ' Parameters
+            .Style = HorizCenteredStyle
+        End With
+        ' Set heading style
+        worksheet.Rows("1").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+        worksheet.Rows("2").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+        ' Rows of data
+        row = 2
+        ' Sort dictionary by low 24 bits
+        Dim sorted = From item In Commands
+                     Order By item.Key And &HFFFFFF
+                     Select item
+        For Each c In sorted
+            worksheet.Cells(row, 0).Value = $"0x{c.Key:x8}"
+            worksheet.Cells(row, 1).Value = c.Value.Mnemonic
+            worksheet.Cells(row, 2).Value = c.Value.Description
+            Dim pNum = 1
+            For Each p In c.Value.Parameters
+                worksheet.Cells(row, 3).Value = $"p{pNum}"
+                worksheet.Cells(row, 4).Value = p.Description
+                worksheet.Cells(row, 5).Value = p.Name
+                Dim typ = p.Typ.ToString
+                Select Case typ
+                    Case "System.Int32" : typ = "Integer"
+                    Case "System.Double" : typ = "Float"
+                End Select
+                worksheet.Cells(row, 6).Value = typ
+                worksheet.Cells(row, 7).Value = p.Scale
+                worksheet.Cells(row, 8).Value = p.Units
+                pNum += 1
+                row += 1
+            Next
+            ' if more than 1 parameter, then merge cols A,B,C for this command
+            Dim pars = c.Value.Parameters.Count
+            If pars > 1 Then
+                For col = 0 To 2
+                    Dim Mstart = A1(row - pars, col)
+                    Dim Mend = A1(row - 1, col)
+                    With worksheet.Cells.GetSubrange($"{Mstart}:{Mend}")
+                        .Merged = True
+                        .Style = VertCenteredStyle
+                    End With
+                Next
+            End If
+            row += 1
+        Next
+        ' Autofit column width
+        Dim columnCount = worksheet.CalculateMaxUsedColumns()
+        For i As Integer = 0 To columnCount - 1
+            worksheet.Columns(i).AutoFit(1, worksheet.Rows(1), worksheet.Rows(worksheet.Rows.Count - 1))
+        Next
+        ' Save the file
+        workbook.Save("commands.ods")
+        TextBox1.AppendText($"Done{vbCrLf}")
+    End Sub
+
+    Shared Function A1(row As Integer, col As Integer) As String
+        ' Convert row, col to A1 style reference
+        Return Chr(Asc("A") + col) & row + 1
+    End Function
 End Class
