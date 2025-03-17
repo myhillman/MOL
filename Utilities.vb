@@ -15,7 +15,7 @@ Friend Module Utilities
 
     Public ScaleUnity = New Matrix3(1, 0, 0, 0, 1, 0, 0, 0, 1)             ' scale factor of 1
     Public ScaleMM = New Matrix3(1 / Form1.xScale, 0, 0, 0, 1 / Form1.yScale, 0, 0, 0, 0)    ' scale steps to mm
-    Public Function Leetro2Float(b As Long) As Single
+    Public Function Float2Double(b As Long) As Single
         ' Converts a custom Leetro floating-point format to an IEEE 754 floating-point number.
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
 
@@ -29,7 +29,7 @@ Friend Module Utilities
         Return ieee.f   ' return floating point
     End Function
 
-    Public Function Float2Leetro(f As Single) As Integer
+    Public Function Double2Float(f As Single) As Integer
         ' Convert integer to Leetro float
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
         ' IEEE float format    [seeeeeee|emmmmmmm|mmmmmmmm|mmmmmmmm]

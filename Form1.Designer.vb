@@ -47,6 +47,7 @@ Partial Class Form1
         FontTestToolStripMenuItem = New ToolStripMenuItem()
         TextBox1 = New TextBox()
         ProgressBar1 = New ProgressBar()
+        TestCutlineToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
@@ -147,7 +148,7 @@ Partial Class Form1
         ' 
         ' TestToolStripMenuItem
         ' 
-        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, FontTestToolStripMenuItem})
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, FontTestToolStripMenuItem, TestCutlineToolStripMenuItem})
         TestToolStripMenuItem.Name = "TestToolStripMenuItem"
         TestToolStripMenuItem.Size = New Size(40, 20)
         TestToolStripMenuItem.Text = "Test"
@@ -212,6 +213,12 @@ Partial Class Form1
         ProgressBar1.Size = New Size(1023, 21)
         ProgressBar1.TabIndex = 2
         ' 
+        ' TestCutlineToolStripMenuItem
+        ' 
+        TestCutlineToolStripMenuItem.Name = "TestCutlineToolStripMenuItem"
+        TestCutlineToolStripMenuItem.Size = New Size(244, 22)
+        TestCutlineToolStripMenuItem.Text = "Test Cutline"
+        ' 
         ' Form1
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
@@ -255,5 +262,6 @@ Partial Class Form1
     Friend WithEvents ConvertLeetroToIEEEToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents FontTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents CommandSpreadsheetToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents TestCutlineToolStripMenuItem As ToolStripMenuItem
 
 End Class

@@ -14,6 +14,44 @@ Imports System.Text
 Imports System.Windows.Ink
 Imports GemBox.Spreadsheet
 
+' Create a pseudo type to handle Leetro floating point numbers in a more natural way
+' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
+Public Structure Float
+    Private ReadOnly value As Integer
+    ' Constructor to initialize from a double
+    Public Sub New(d As Double)
+        value = Double2Float(d)
+    End Sub
+
+    ' Constructor to initialize from an integer
+    Public Sub New(leetro As Integer)
+        value = leetro
+    End Sub
+    ' Property to get the double value
+    Public ReadOnly Property AsDouble() As Double
+        Get
+            Return Float2Double(value)
+        End Get
+    End Property
+
+    ' Method to encode a double to Leetro format
+    Public Shared Function Encode(d As Double) As Float
+        Return New Float(d)
+    End Function
+    Public Shared Function Encode(i As Integer) As Float
+        Return New Float(CDbl(i))
+    End Function
+
+    ' Method to decode a Leetro format to double
+    Public Shared Function Decode(l As Float) As Double
+        Return l.AsDouble
+    End Function
+
+    ' Override ToString method for easy display
+    Public Overrides Function ToString() As String
+        Return AsDouble().ToString()
+    End Function
+End Structure
 
 ' Define the different block types
 Public Enum BLOCKTYPE
@@ -32,18 +70,18 @@ Public Enum ParameterCount
     VARIABLE    ' the number of parameters for this command is variable
 End Enum
 ' Define some custom types
-Friend Enum OnOff_type
+Friend Enum OnOff_Enum
     Off = 0
     [On] = 1
     Engrave = 2
 End Enum
 
-Friend Enum Axis_type
+Friend Enum Axis_Enum
     X = 4
     Y = 3
 End Enum
 
-Friend Enum Acceleration_type
+Friend Enum Acceleration_Enum
     Accelerate = 1
     Decelerate = 2
 End Enum
@@ -53,13 +91,13 @@ End Enum
     <FieldOffset(0)>
     Public Steps As Integer
     <FieldOffset(0)>
-    Public OnSteps As Short        ' number of steps laser on
+    Public OnSteps As UShort        ' number of steps laser on
     <FieldOffset(2)>
-    Public OffSteps As Short        ' number of steps laser off
+    Public OffSteps As UShort        ' number of steps laser off
 End Structure
 
 Public Class Form1
-    Private Const BLOCK_SIZE = 512          ' 4-byte words. MOL is divided into blocks or chunks
+    Private Const BLOCK_SIZE = 512          ' bytes. MOL is divided into blocks or chunks
     Private debugflag As Boolean = True
     Private hexdump As Boolean = False
     Private dlg = New OpenFileDialog
@@ -72,7 +110,7 @@ Public Class Form1
     Private Const NumColors = 255
     Private colors(NumColors) As AciColor   ' array of colors
     Private ColorIndex As Integer = 1       ' index into colors array
-    Private CommandUsage As New Dictionary(Of Integer, Integer)
+    Private CommandUsage As New Dictionary(Of Integer, Integer)(50)
     Private dxf As New DxfDocument()
     Private StepsArray() As OnOffSteps              ' parameter to ENGLSR command
     Private Stack As New Stack()                    ' used by GOSUB to hold return address
@@ -99,14 +137,15 @@ Public Class Form1
     Private LaserIsOn As Boolean = False        ' tracks state of laser
     Public xScale As Double = 125.9842519685039    ' X axis steps/mm.   From the Worktable config dialog [Pulse Unit] parameter
     Public yScale As Double = 125.9842519685039    ' Y axis steps/mm
+    Public zScale As Double = 125.9842519685039    ' Z axis steps/mm
     Friend ScaleToSteps = New Matrix(xScale, 0.0, 0.0, yScale, 0.0, 0.0)       ' matrix to scale mm to steps
     Private AccelLength As Double      ' Acceleration and Deceleration distance
-    Private CurrentBlockType As BLOCKTYPE
     Private CurrentSubr As Integer = 0                ' current subroutine we are in
     Private StartPosns As New Dictionary(Of Integer, (Absolute As Boolean, position As IntPoint))      ' start position for drawing by subroutine #
     Private SubrAddrs As New Dictionary(Of Integer, Integer)       ' list of subroutine numbers and their start address
+    Private FileSize As Integer         ' length of file in bytes
     Private ConfigChunk As Integer, TestChunk As Integer, CutChunk As Integer
-    Private DrawChunks As New List(Of Integer)      ' list of draw chunks
+    Private DrawChunks As New List(Of Integer)(10)     ' list of draw chunks
     Private EmptyVector As New Vector2(0, 0)
     Private ENGLSRsteps As New List(Of OnOffSteps)
     Private FirstMove As Boolean = True           ' true if next MVREL will be the first
@@ -239,6 +278,8 @@ Public Class Form1
     Private Const MOL_UNKNOWN07 = &H3046040      ' unknown command refered to in London Hackspace documents
     Private Const MOL_UNKNOWN09 = &H326040      ' unknown command refered to in London Hackspace documents
 
+    Private Const MOL_ENGLSR1 = &H80000A46
+
     ' Dictionary of all commands
     Private Commands As New SortedDictionary(Of Integer, LASERcmd) From {
         {MOL_MVREL, New LASERcmd("MVREL", "Move the cutter by dx,dy", ParameterCount.FIXED, New List(Of Parameter) From {
@@ -254,9 +295,9 @@ Public Class Form1
                             }
                            )},
         {MOL_SCALE, New LASERcmd("SCALE", "The scale used on all 3 axis", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("x scale", "the X scale", GetType(Double),, "steps/mm")},
-                            {New Parameter("y scale", "the Y scale", GetType(Double),, "steps/mm")},
-                            {New Parameter("z scale", "the Z scale", GetType(Double),, "steps/mm")}
+                            {New Parameter("x scale", "the X scale", GetType(Float),, "steps/mm")},
+                            {New Parameter("y scale", "the Y scale", GetType(Float),, "steps/mm")},
+                            {New Parameter("z scale", "the Z scale", GetType(Float),, "steps/mm")}
                             }
                            )},
         {MOL_ORIGIN, New LASERcmd("ORIGIN", "", ParameterCount.FIXED, New List(Of Parameter) From {
@@ -281,23 +322,23 @@ Public Class Form1
                         {New Parameter("Size", "Number of words (limited to 510)", GetType(Int32),, "Words")}}
                         )},
         {MOL_MOTION, New LASERcmd("MOTION", "Set min/max speed & acceleration", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("Initial speed", "", GetType(Double), 1 / xScale, "mm/s")},
-                            {New Parameter("Max speed", "", GetType(Double), 1 / xScale, "mm/s")},
-                            {New Parameter("Acceleration", "", GetType(Double), 1 / xScale, "mm/s²")}
+                            {New Parameter("Initial speed", "", GetType(Float), 1 / xScale, "mm/s")},
+                            {New Parameter("Max speed", "", GetType(Float), 1 / xScale, "mm/s")},
+                            {New Parameter("Acceleration", "", GetType(Float), 1 / xScale, "mm/s²")}
                             }
                            )},
         {MOL_SETSPD, New LASERcmd("SETSPD", "Set min/max speed & acceleration", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("Initial speed", "", GetType(Double), 1 / xScale, "mm/s")},
-                            {New Parameter("Max speed", "", GetType(Double), 1 / xScale, "mm/s")},
-                            {New Parameter("Acceleration", "", GetType(Double), 1 / xScale, "mm/s²")}
+                            {New Parameter("Initial speed", "", GetType(Float), 1 / xScale, "mm/s")},
+                            {New Parameter("Max speed", "", GetType(Float), 1 / xScale, "mm/s")},
+                            {New Parameter("Acceleration", "", GetType(Float), 1 / xScale, "mm/s²")}
                             }
                            )},
         {MOL_PWRSPD5, New LASERcmd("PWRSPD5", "Set Power & Speed", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
-                            {New Parameter("Start speed", "", GetType(Double), 1 / xScale, "mm/s")},
-                            {New Parameter("Max speed", "", GetType(Double), 1 / xScale, "mm/s")},
-                            {New Parameter("Unknown", "", GetType(Double))}
+                            {New Parameter("Start speed", "", GetType(Float), 1 / xScale, "mm/s")},
+                            {New Parameter("Max speed", "", GetType(Float), 1 / xScale, "mm/s")},
+                            {New Parameter("Unknown", "", GetType(Float))}
                           }
                          )},
         {MOL_PWRSPD7, New LASERcmd("PWRSPD7", "Set Power & Speed (2 heads)", ParameterCount.FIXED, New List(Of Parameter) From {
@@ -305,29 +346,29 @@ Public Class Form1
                             {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Laser 2 Corner PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Laser 2 Max PWR", "", GetType(Int32), 0.01, "%")},
-                            {New Parameter("Start speed", "", GetType(Double), 1 / xScale, "mm/s")},
-                            {New Parameter("Max speed", "", GetType(Double), 1 / xScale, "mm/s")},
-                            {New Parameter("Unknown", "", GetType(Double))}
+                            {New Parameter("Start speed", "", GetType(Float), 1 / xScale, "mm/s")},
+                            {New Parameter("Max speed", "", GetType(Float), 1 / xScale, "mm/s")},
+                            {New Parameter("Unknown", "", GetType(Float))}
                             }
                          )},
         {MOL_LASER, New LASERcmd("LASER", "Laser on or off control", ParameterCount.FIXED, New List(Of Parameter) From {
-                {New Parameter("On/Off", "On or Off", GetType(OnOff_type))}})},
+                {New Parameter("On/Off", "On or Off", GetType(OnOff_Enum))}})},
         {MOL_LASER1, New LASERcmd("LASER1", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(Int32))}})},
         {MOL_LASER2, New LASERcmd("LASER2", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(Int32))}})},
         {MOL_LASER3, New LASERcmd("LASER3", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(Int32))}})},
-        {MOL_GOSUB, New LASERcmd("GOSUB", "Call a subroutine", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_GOSUB, New LASERcmd("GOSUB", "Call a subroutine with no parameters", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "Number of the subroutine", GetType(Int32))}
                             }
                            )},
-        {MOL_GOSUBb, New LASERcmd("GOSUBb", "Begin of subroutine", ParameterCount.VARIABLE, New List(Of Parameter) From {
+        {MOL_GOSUBb, New LASERcmd("GOSUBb", "Call subroutine with 3 parameters", ParameterCount.VARIABLE, New List(Of Parameter) From {
                         {New Parameter("n", "Subroutine number", GetType(Int32))},
-                        {New Parameter("x", "x value", GetType(Double))},
-                        {New Parameter("y", "y value", GetType(Double))}}
+                        {New Parameter("x", "x value", GetType(Float))},
+                        {New Parameter("y", "y value", GetType(Float))}}
                         )},
         {MOL_GOSUB3, New LASERcmd("GOSUB3", "Call subroutine with 3 parameters", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "Number of the subroutine", GetType(Int32))},
-                            {New Parameter("x", "x parameter", GetType(Double))},
-                            {New Parameter("y", "y parameter", GetType(Double))}
+                            {New Parameter("x", "x parameter", GetType(Float))},
+                            {New Parameter("y", "y parameter", GetType(Float))}
                             }
                            )},
         {MOL_X5_FIRST, New LASERcmd("X5_FIRST", "", ParameterCount.FIXED)},
@@ -338,13 +379,13 @@ Public Class Form1
                            )},
         {MOL_GOSUBn, New LASERcmd("GOSUBn", "", ParameterCount.VARIABLE, New List(Of Parameter) From {
                             {New Parameter("n", "", GetType(Int32))},
-                            {New Parameter("x", "", GetType(Double))},
-                            {New Parameter("y", "", GetType(Double))}
+                            {New Parameter("x", "", GetType(Float))},
+                            {New Parameter("y", "", GetType(Float))}
                             }
                            )},
-        {MOL_ACCELERATION, New LASERcmd("ACCELERATION", "Accelerate or Decelerate", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Acceleration", "", GetType(Acceleration_type))}})},
-        {MOL_BLWR, New LASERcmd("BLWR", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_type))}})},
-        {MOL_BLWRa, New LASERcmd("BLWRa", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_type))}})},
+        {MOL_ACCELERATION, New LASERcmd("ACCELERATION", "Accelerate or Decelerate", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Acceleration", "", GetType(Acceleration_Enum))}})},
+        {MOL_BLWR, New LASERcmd("BLWR", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
+        {MOL_BLWRa, New LASERcmd("BLWRa", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
         {MOL_ENGPWR, New LASERcmd("ENGPWR", "Engrave Power", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Engrave power", "", GetType(Integer), 0.01, "%")}})},
         {MOL_ENGPWR1, New LASERcmd("ENGPWR1", "", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("Power", "", GetType(Integer), 0.01, "%")},
@@ -352,27 +393,33 @@ Public Class Form1
                 }
               )},
         {MOL_ENGSPD, New LASERcmd("ENGSPD", "Engrave speed", ParameterCount.FIXED, New List(Of Parameter) From {
-                {New Parameter("Axis", "", GetType(Axis_type))},
-                {New Parameter("Speed", "", GetType(Double), 1 / xScale, "mm/s")}
+                {New Parameter("Axis", "", GetType(Axis_Enum))},
+                {New Parameter("Speed", "", GetType(Float), 1 / xScale, "mm/s")}
                 }
               )},
         {MOL_ENGSPD1, New LASERcmd("ENGSPD1", "", ParameterCount.FIXED, New List(Of Parameter) From {
-                {New Parameter("Axis", "", GetType(Axis_type))},
-                {New Parameter("??", "", GetType(Double))},
-                {New Parameter("Speed", "", GetType(Double), 1 / xScale, "mm/s")},
-                {New Parameter("??", "", GetType(Double))}
+                {New Parameter("Axis", "", GetType(Axis_Enum))},
+                {New Parameter("??", "", GetType(Float))},
+                {New Parameter("Speed", "", GetType(Float), 1 / xScale, "mm/s")},
+                {New Parameter("??", "", GetType(Float))}
                 }
               )},
-        {MOL_ENGMVX, New LASERcmd("ENGMVX", "Engrave one line in the X direction", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Axis", "", GetType(Axis_type))}, {New Parameter("dx", "", GetType(Integer), 1 / yScale, "mm")}})},
-                {MOL_ENGMVY, New LASERcmd("ENGMVY", "Engraving - Move in the Y direction", ParameterCount.FIXED, New List(Of Parameter) From {
-                {New Parameter("Axis", "", GetType(Axis_type))},
-                {New Parameter("dy", "Distance to move", GetType(Integer), 1 / yScale, "mm")}}
+        {MOL_ENGMVX, New LASERcmd("ENGMVX", "Engrave one line in the X direction", ParameterCount.FIXED, New List(Of Parameter) From {
+                {New Parameter("Axis", "", GetType(Axis_Enum))}, {New Parameter("dx", "", GetType(Integer), 1 / xScale, "mm")}}
+            )},
+        {MOL_ENGMVY, New LASERcmd("ENGMVY", "Engraving - Move in the Y direction", ParameterCount.FIXED, New List(Of Parameter) From {
+        {New Parameter("Axis", "", GetType(Axis_Enum))},
+        {New Parameter("dy", "Distance to move", GetType(Integer), 1 / yScale, "mm")}}
         )},
         {MOL_ENGACD, New LASERcmd("ENGACD", "Engraving (Ac)(De)celeration distance", ParameterCount.FIXED, New List(Of Parameter) From {
                     {New Parameter("x", "distance", GetType(Int32), 1 / xScale, "mm")}}
                     )},
         {MOL_ENGLSR, New LASERcmd("ENGLSR", "Engraving On/Off pattern", ParameterCount.VARIABLE, New List(Of Parameter) From {
-                            {New Parameter("List of steps", "List of On/Off patterns", GetType(OnOffSteps), 1 / xScale, "mm")}
+                            {New Parameter("List of steps", "List of On/Off patterns", GetType(List(Of OnOffSteps)), 1 / xScale, "mm")}
+                            }
+                           )},
+        {MOL_ENGLSR1, New LASERcmd("ENGLSR1", "Engraving On/Off pattern", ParameterCount.VARIABLE, New List(Of Parameter) From {
+                            {New Parameter("List of steps", "List of On/Off patterns", GetType(List(Of OnOffSteps)), 1 / xScale, "mm")}
                             }
                            )},
         {MOL_END, New LASERcmd("END", "End of code")}
@@ -395,7 +442,7 @@ Public Class Form1
 
     Public Function GetFloat() As Double
         ' read 4 byte float from current offset
-        Return Leetro2Float(GetUInt())
+        Return Float2Double(GetUInt())
     End Function
 
     Public Function GetFloat(n As Integer) As Double
@@ -407,9 +454,9 @@ Public Class Form1
     Public Sub PutFloat(f As Double)
         ' write float at current offset
         If UseMCBLK Then
-            MCBLK.Add(Float2Leetro(f))
+            MCBLK.Add(Double2Float(f))
         Else
-            writer.Write(Float2Leetro(f))
+            writer.Write(Double2Float(f))
         End If
     End Sub
 
@@ -436,7 +483,6 @@ Public Class Form1
         ' Display header info
         Dim chunk As Integer
 
-        CurrentBlockType = BLOCKTYPE.HEADER
         reader.BaseStream.Position = 0
         textfile.WriteLine($"HEADER &0")
         textfile.WriteLine($"Size of file: &h{GetInt():x} bytes")
@@ -448,10 +494,11 @@ Public Class Form1
         textfile.WriteLine($"Origin: ({TopRight.X},{TopRight.Y}) ({TopRight.X / xScale:f2},{TopRight.Y / yScale:f2})mm")
         BottomLeft = New IntPoint(GetInt(&H20), GetInt())
         textfile.WriteLine($"Bottom Left: ({BottomLeft.X},{BottomLeft.Y}) ({BottomLeft.X / xScale:f2},{BottomLeft.Y / yScale:f2})mm")
-
+        FileSize = GetInt(0)
         ConfigChunk = GetInt(&H70)
         TestChunk = GetInt(&H74)
         CutChunk = GetInt(&H78)
+        DrawChunks.Clear()
         chunk = GetInt(&H7C)        ' first draw chunk
         While chunk <> 0
             DrawChunks.Add(chunk)
@@ -464,20 +511,18 @@ Public Class Form1
         textfile.WriteLine()
     End Sub
 
-    Public Sub DecodeStream(writer As System.IO.StreamWriter, block As BLOCKTYPE, StartAddress As Integer)
+    Public Sub DecodeStream(writer As System.IO.StreamWriter, StartAddress As Integer)
         ' Decode a stream of commands
         ' StartAddress - start of commands
         ' Set start position for this block
-        Dim subr As Integer
-        Select Case block       ' convert block to subroutine
-            Case BLOCKTYPE.TEST : subr = 1
-            Case BLOCKTYPE.CUT : subr = 2
-            Case Else
-                subr = 0
-        End Select
-        If StartPosns.ContainsKey(subr) Then
-            If StartPosns(subr).Absolute Then position = StartPosns(subr).position Else position += StartPosns(subr).position
-        Else position = New IntPoint(0, 0)
+        Dim block As BLOCKTYPE = GetBlockType(StartAddress)
+        Dim cmd = GetInt(StartAddress)
+        If cmd = MOL_BEGSUBa Then
+            Dim subr As Integer = GetInt(StartAddress + 4)      ' extract subroutine number
+            If StartPosns.ContainsKey(subr) Then
+                If StartPosns(subr).Absolute Then position = StartPosns(subr).position Else position += StartPosns(subr).position
+            Else position = New IntPoint(0, 0)
+            End If
         End If
         writer.WriteLine()
         writer.WriteLine($"Decode of commands at 0x{StartAddress:x} in block {block}")
@@ -497,73 +542,86 @@ Public Class Form1
         ' Lookup command in known commands table
         ' returns false if at end of stream
 
-        Dim value As LASERcmd = Nothing, cmd As Integer, cmd_len As Integer
+        Try
+            Dim value As LASERcmd = Nothing, cmd As Integer, cmd_len As Integer, OneStep As OnOffSteps
 
-        Dim cmdBegin = reader.BaseStream.Position         ' remember start of command
-        writer.Write($"{cmdBegin:x}: ")
-        cmd = GetInt()                  ' get command
-        If Not CommandUsage.TryAdd(cmd, 1) Then CommandUsage(cmd) += 1      ' count commands used
-        If cmd = MOL_END Then
-            writer.WriteLine("END")
-            Return False
-        End If      ' We are done
-        cmd_len = cmd >> 24 And &HFF
-        If cmd_len = &H80 Then
-            cmd_len = GetInt() And &H1FF
-        End If
-        Select Case cmd
-            Case MOL_MCBLK
-                MCBLKCounter = cmd_len                  ' size of MCBLK in words
-                cmd_len = 1        ' allow contents of MCBLK to decode
-                reader.BaseStream.Position = cmdBegin + 4     ' backup so we can read length as parameter
-        End Select
-
-        If MCBLKCounter > 0 And cmd <> MOL_MCBLK Then writer.Write(" >")     ' prefix MCBLK with indicator
-        If Commands.TryGetValue(cmd, value) Then
-            If value.ParameterType = ParameterCount.FIXED And cmd_len <> value.Parameters.Count And cmd <> MOL_MCBLK Then
-                Throw New System.Exception($"Command {value.Mnemonic}: length is {cmd_len}, but data table says {value.Parameters.Count}")
+            Dim cmdBegin = reader.BaseStream.Position         ' remember start of command
+            writer.Write($"0x{cmdBegin:x}: ")
+            cmd = GetInt()                  ' get command
+            If Not CommandUsage.TryAdd(cmd, 1) Then CommandUsage(cmd) += 1      ' count commands used
+            If cmd = MOL_END Then
+                writer.WriteLine("END")
+                Return False
+            End If      ' We are done
+            cmd_len = cmd >> 24 And &HFF
+            If cmd_len = &H80 Then
+                cmd_len = GetInt() And &H1FF
             End If
+            Select Case cmd
+                Case MOL_MCBLK
+                    MCBLKCounter = cmd_len                  ' size of MCBLK in words
+                    cmd_len = 1        ' allow contents of MCBLK to decode
+                    reader.BaseStream.Position = cmdBegin + 4     ' backup so we can read length as parameter
+            End Select
 
-            writer.Write($" {value.Mnemonic}")
-            For Each p In value.Parameters
-                writer.Write($" {p.Name}=")
-                Select Case p.Typ
-                    Case GetType(Boolean) : writer.Write(CType(GetInt(), Boolean))
-                    Case GetType(Int32) : If p.Scale = 1.0 Then writer.Write($"{GetInt()} {p.Units}") Else writer.Write($"{GetInt() * p.Scale:f2} {p.Units}")
-                    Case GetType(Double) : writer.Write($"{GetFloat() * p.Scale:f2} {p.Units}")
-                    Case GetType(OnOff_type) : Dim par = GetInt() : If par Mod 2 = 0 Then writer.Write($"Off({par:x})") Else writer.Write($"On({par:x})")
-                    Case GetType(Acceleration_type) : writer.Write($"{CType(GetInt(), Acceleration_type)}")
-                    Case GetType(Axis_type) : writer.Write($"{CType(GetInt(), Axis_type)}")
-                    Case GetType(OnOffSteps)    ' a list of On/Off steps
-                        writer.Write($"List of {cmd_len} On/Off steps ")
-                        Dim OneStep As OnOffSteps
-                        For i = 1 To cmd_len    ' one structure for each word
-                            OneStep.Steps = GetUInt()     ' get 32 bit word
-                            writer.Write($" {OneStep.OnSteps * p.Scale:f2}/{OneStep.OffSteps * p.Scale:f2} {p.Units}")
-                        Next
-                    Case Else
-                        Throw New System.Exception($"{value.Mnemonic}: Unrecognised parameter type of {p.Typ}")
-                End Select
-            Next
-        Else
-            ' UNKNOWN command. Just show parameters
-            writer.Write($" Unknown: {cmd:x8} Params {cmd_len}: ")
-            For i = 1 To cmd_len
-                Dim n As Integer = GetInt()
-                writer.Write($" {n:x8}")
-            Next
-        End If
-        writer.WriteLine()
-        'reader.BaseStream.Seek(cmdBegin + cmd_len * 4 + 4, 0)       ' move to next command
-        If cmd <> MOL_MCBLK Then MCBLKCounter -= (cmd_len + 1)
-        Return True         ' more commands follow
+            If MCBLKCounter > 0 And cmd <> MOL_MCBLK Then writer.Write(" >")     ' prefix MCBLK with indicator
+            If Commands.TryGetValue(cmd, value) Then
+                If value.ParameterType = ParameterCount.FIXED And cmd_len <> value.Parameters.Count And cmd <> MOL_MCBLK Then
+                    Throw New System.Exception($"Command {value.Mnemonic}: length is {cmd_len}, but data table says {value.Parameters.Count}")
+                End If
+
+                writer.Write($" {value.Mnemonic}")
+                For Each p In value.Parameters
+                    writer.Write($" {p.Name}=")
+                    Select Case p.Typ
+                        Case GetType(Boolean) : writer.Write(CType(GetInt(), Boolean))
+                        Case GetType(Int32) : If p.Scale = 1.0 Then writer.Write($"{GetInt()} {p.Units}") Else writer.Write($"{GetInt() * p.Scale:f2} {p.Units}")
+                        Case GetType(Float)
+                            Dim l As New Float(GetInt())
+                            Dim val = l.AsDouble      ' get float value
+                            If p.Scale = 1.0 Then
+                                writer.Write($"{val:f2} {p.Units}")
+                            Else
+                                writer.Write($"{val * p.Scale:f2} {p.Units}")
+                            End If
+                        Case GetType(OnOff_Enum) : Dim par = GetInt() : If par Mod 2 = 0 Then writer.Write($"Off({par:x})") Else writer.Write($"On({par:x})")
+                        Case GetType(Acceleration_Enum) : writer.Write($"{CType(GetInt(), Acceleration_Enum)}")
+                        Case GetType(Axis_Enum) : writer.Write($"{CType(GetInt(), Axis_Enum)}")
+                        Case GetType(List(Of OnOffSteps))    ' a list of On/Off steps
+                            writer.Write($"List of {cmd_len} On/Off steps ")
+                            For i = 1 To cmd_len    ' one structure for each word
+                                OneStep.Steps = GetInt()     ' get 32 bit word
+                                writer.Write($" {OneStep.OnSteps * p.Scale:f2}/{OneStep.OffSteps * p.Scale:f2} {p.Units}")
+                            Next
+                        Case GetType(OnOffSteps)    ' a  On/Off steps
+                            OneStep.Steps = GetInt()     ' get 32 bit word
+                            writer.Write($" One On/Off step {OneStep.OnSteps * p.Scale:f2}/{OneStep.OffSteps * p.Scale:f2} {p.Units}")
+                        Case Else
+                            Throw New System.Exception($"{value.Mnemonic}: Unrecognised parameter type of {p.Typ}")
+                    End Select
+                Next
+            Else
+                ' UNKNOWN command. Just show parameters
+                writer.Write($" Unknown: 0x{cmd:x8} Params {cmd_len}: ")
+                For i = 1 To cmd_len
+                    Dim n As Integer = GetInt()
+                    writer.Write($" 0x{n:x8}")
+                    If n < 0 Or n > 500 Then writer.Write($" ({Float2Double(n)}f)")
+                Next
+            End If
+            writer.WriteLine()
+            'reader.BaseStream.Seek(cmdBegin + cmd_len * 4 + 4, 0)       ' move to next command
+            If cmd <> MOL_MCBLK Then MCBLKCounter -= (cmd_len + 1)
+            Return True         ' more commands follow
+        Catch ex As Exception
+            Throw New Exception(ex.Message)
+        End Try
     End Function
 
-    Public Sub ExecuteStream(block As BLOCKTYPE, StartAddress As Integer, dxf As DxfDocument, DefaultLayer As Layer)
+    Public Sub ExecuteStream(StartAddress As Integer, dxf As DxfDocument, DefaultLayer As Layer)
         ' Execute a stream of commands, rendering in dxf as we go
         Dim AddrTrace As New List(Of Integer)
         Dim layer = DefaultLayer
-        Dim CurrentBlock = block
         ' Set start position for this block
         ' Translate start address to subroutine
         ' Look in start address
@@ -572,14 +630,14 @@ Public Class Form1
         Dim addr = StartAddress
         Do
             'AddrTrace.Add(addr)
-            addr = ExecuteCmd(CurrentBlock, addr, dxf, layer)       ' execute command at addr
+            addr = ExecuteCmd(addr, dxf, layer)       ' execute command at addr
         Loop Until addr = 0         ' loop until an END statement
     End Sub
 
-    Public Function ExecuteCmd(ByRef block As BLOCKTYPE, ByVal addr As Integer, dxf As DxfDocument, ByRef Layer As Layer) As Integer
+    Public Function ExecuteCmd(ByVal addr As Integer, dxf As DxfDocument, ByRef Layer As Layer) As Integer
         ' Execute a command at addr. Return addr as start of next instruction
-        Dim cmd As Integer, nWords As Integer
-
+        Dim cmd As Integer, nWords As Integer, Steps As OnOffSteps
+        Dim block As BLOCKTYPE = GetBlockType(addr)
         Dim i As UInteger
         cmd = GetInt(addr)      ' get the command
 
@@ -616,7 +674,7 @@ Public Class Form1
                 End Select
 
             Case MOL_SCALE      ' also MOL_SPDPWR, MOL_SPDPWRx
-                xScale = GetFloat() : yScale = GetFloat() : GetFloat()        ' x,y,z scale command
+                xScale = GetFloat() : yScale = GetFloat() : zScale = GetFloat()        ' x,y,z scale command
 
             Case MOL_MVREL, MOL_START
                 Dim n = GetUInt()           ' always 772
@@ -669,6 +727,7 @@ Public Class Form1
                 ' ENGMVX is in 3 phases, Accelerate, Engrave, Decelerate
                 Dim TotalSteps = GetInt()
                 Dim direction = Math.Sign(TotalSteps)     ' 1=LtoR, -1=RtoL
+                If direction = 0 Then direction = 1
                 ' Move for the initial acceleration
                 Dim delta As New IntPoint(AccelLength * direction, 0)
                 DXF_line(position, position + delta, MoveLayer)
@@ -688,6 +747,7 @@ Public Class Form1
                 delta = New IntPoint(AccelLength * direction, 0)
                 DXF_line(position, position + delta, MoveLayer)
                 position += delta       ' move the position along
+                ENGLSRsteps.Clear()     ' clear the steps
 
             Case MOL_ENGMVY     ' Engrave move Y (laser off)
                 Dim axis = GetInt()      ' consume Axis parameter
@@ -696,10 +756,9 @@ Public Class Form1
                 DXF_line(position, position + delta, MoveLayer)
                 position += delta      ' move position along
 
-            Case MOL_ENGLSR       ' engraving movement
-                ENGLSRsteps.Clear()
+            Case MOL_ENGLSR, MOL_ENGLSR1     ' engraving movement
+                'ENGLSRsteps.Clear()
                 For i = 1 To nWords
-                    Dim Steps As OnOffSteps
                     Steps.Steps = GetInt()      ' get 2 16 bit values, accessable through OnSteps & OffSteps
                     ENGLSRsteps.Add(Steps)
                 Next
@@ -715,20 +774,14 @@ Public Class Form1
                         Throw New SystemException($"GOSUB {n} has no start position")
                     End If
                 End If
-                Select Case n
-                    Case 1
+                Select Case block
+                    Case BLOCKTYPE.TEST
                         Layer = TestLayer
-                        block = BLOCKTYPE.TEST
-                    Case 2
+                    Case BLOCKTYPE.CUT
                         Layer = CutLayer
-                        block = BLOCKTYPE.CUT
-                    Case 3
+                    Case BLOCKTYPE.DRAW
                         Layer = EngraveLayer
-                        block = BLOCKTYPE.DRAW
-                    Case 4
-                        Layer = TextLayer
-                        block = BLOCKTYPE.DRAW
-                    Case 5 To 100
+                    Case Else
                         ' Create layer for this subroutine
                         Layer = New Layer($"SUBR {n}") With
                                 {
@@ -755,8 +808,7 @@ Public Class Form1
                 TextBox1.AppendText($"Position at end of subr {n} is ({position.X},{position.Y}){vbCrLf}")
                 If Stack.Count > 0 Then
                     Dim popped = Stack.Pop
-                    block = popped.item2    'blk
-                    Layer = popped.item3    'lyr
+                    Layer = popped.item2    'lyr
                     reader.BaseStream.Seek(popped.item1, 0)     ' return to the saved return address
                     Return reader.BaseStream.Position
                 Else
@@ -767,7 +819,7 @@ Public Class Form1
                 Dim n = GetInt()     ' get subroutine number
                 Dim posn = New IntPoint(GetFloat(), GetFloat())     ' subroutine parameter ignored
                 If n < 100 Then
-                    Stack.Push((addr:=reader.BaseStream.Position, blk:=block, lyr:=Layer))              ' address of next instruction + current 
+                    Stack.Push((addr:=reader.BaseStream.Position, lyr:=Layer))              ' address of next instruction + current 
                     Return SubrAddrs(n)                     ' jump to start address and continue
                 Else
                     Return reader.BaseStream.Position       ' ignore call. Goto next instruction
@@ -791,6 +843,23 @@ Public Class Form1
         Return param_posn + nWords * 4       ' address of next instruction
     End Function
 
+    Private Function GetBlockType(addr As Integer) As BLOCKTYPE
+        ' Translate an address to a block type
+        Select Case addr
+            Case 0 To BLOCK_SIZE - 1
+                Return BLOCKTYPE.HEADER
+            Case ConfigChunk * BLOCK_SIZE To (ConfigChunk + 1) * BLOCK_SIZE - 1
+                Return BLOCKTYPE.CONFIG
+            Case TestChunk * BLOCK_SIZE To (TestChunk + 1) * BLOCK_SIZE - 1
+                Return BLOCKTYPE.TEST
+            Case CutChunk * BLOCK_SIZE To (CutChunk + 1) * BLOCK_SIZE - 1
+                Return BLOCKTYPE.CUT
+            Case DrawChunks(0) * BLOCK_SIZE To FileSize
+                Return BLOCKTYPE.DRAW
+            Case Else
+                Throw New System.Exception($"Unknown block type at address {addr:x8}")
+        End Select
+    End Function
     ' DXF_line sub with Vector2 parameters
     'Sub DXF_line(startpoint As Vector2, endpoint As Vector2, layer As Layer, ByVal Optional color As AciColor = Nothing)
     '    ' Add line to dxf file specified by startpoint, endpoint and layer. position is updated.
@@ -931,6 +1000,10 @@ Public Class Form1
         writer.Write(buffer)                    ' write to new file
         buffer = reader.ReadBytes(BLOCK_SIZE)      ' read empty block
         writer.Write(buffer)                    ' write to new file
+
+        ConfigChunk = GetInt(&H70)
+        TestChunk = GetInt()
+        CutChunk = GetInt()
         reader.Close()
 
         MakeTestBlock(writer, dxf, Outline, TestLayer)
@@ -958,7 +1031,7 @@ Public Class Form1
         ' Update to add subroutines
         writer.BaseStream.Position = &H274
         For i = 3 To 4
-            WriteMOL(MOL_MOTION, {StartSpeed * xScale, QuickSpeed * xScale, WorkAcc * xScale})
+            WriteMOL(MOL_MOTION, {Float.Encode(StartSpeed * xScale), Float.Encode(QuickSpeed * xScale), Float.Encode(WorkAcc * xScale)})
             WriteMOL(MOL_START, {772, StartPosns(i).position.X, StartPosns(i).position.Y})
             WriteMOL(MOL_GOSUBn, {3, i, 0, 0})
         Next
@@ -990,7 +1063,7 @@ Public Class Form1
         position = New IntPoint(0, 0)       ' Layer starts at (0,0)
         WriteMOL(MOL_BEGSUBa, {2}, &H600)    ' begin SUB 2
         WriteMOL(&H80600148, {6, &H25B, &H91D4000, &HF13A300, &H1113A340, &H101D7A80, &HF716C00})   ' Unknown command
-        WriteMOL(MOL_PWRSPD5, {ClipBoxPower * 100, ClipBoxPower * 100, ClipBoxSpeed * xScale, ClipBoxSpeed * xScale, 0.0})    ' set power & speed
+        WriteMOL(MOL_PWRSPD5, {ClipBoxPower * 100, ClipBoxPower * 100, Float.Encode(ClipBoxSpeed * xScale), Float.Encode(ClipBoxSpeed * xScale), Float.Encode(0.0)})    ' set power & speed
         UseMCBLK = True
         Dim delta = CType(outline.BottomRight, IntPoint)     ' convert to steps
         DXF_line(position, position + delta, CutLayer)
@@ -1004,9 +1077,9 @@ Public Class Form1
     Public Sub MakeEngraveBlock(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, layer As Layer, speeds() As Integer, powers() As Integer)
 
         ' Create engraving as SUBR 3. Subroutine engraves a single cell
-        Dim StartofBlock = 5 * BLOCK_SIZE   ' address of start of next block. First subr at A00
-        Dim BlockNumber = 5
-        PutInt(BlockNumber, &H7C)
+        Const BlockNumber = 5       ' block number of first subroutine
+        Dim StartofBlock = BlockNumber * BLOCK_SIZE   ' address of start of next block. First subr at A00
+        PutInt(BlockNumber, &H7C) : DrawChunks.Add(BlockNumber)
         writer.BaseStream.Position = StartofBlock       ' position at start of block
         WriteMOL(MOL_BEGSUBa, {3}, StartofBlock)    ' begin SUB 
         WriteMOL(&H1000D46, {&HBB8})         ' unknown command
@@ -1023,7 +1096,7 @@ Public Class Form1
                 Dim cell = New Rect(New System.Windows.Point(outline.Left + power * cellsize.Width, outline.Top + speed * cellsize.Height), cellsize)  ' one 10x10 cell
                 cell = Rect.Inflate(cell, -0.75, -0.75)       ' shrink it a bit to create a margin
                 DrawBox(writer, dxf, cell, layer, My.Settings.Engrave, powers(power), speeds(speed))
-                WriteMOL(MOL_LASER, {OnOff_type.Off})    ' turn laser off
+                WriteMOL(MOL_LASER, {OnOff_Enum.Off})    ' turn laser off
             Next
         Next
         WriteMOL(&H1000B46, {&H200})         ' unknown command
@@ -1036,8 +1109,8 @@ Public Class Form1
         ' Create Text layer as SUBR 4
         Dim StartofBlock = (writer.BaseStream.Position \ BLOCK_SIZE + 1) * BLOCK_SIZE   ' address of start of next block
         Dim BlockNumber = StartofBlock \ BLOCK_SIZE
+        PutInt(BlockNumber, &H7C + 4) : DrawChunks.Add(BlockNumber)
         Dim cellsize = New Size(Outline.Width / 10, Outline.Height / 10)
-        PutInt(BlockNumber, &H7C + 4)
         WriteMOL(MOL_BEGSUBa, {4}, StartofBlock)    ' begin SUB
         UseMCBLK = True
         DrawText(writer, dxf, My.Settings.Material, System.Windows.TextAlignment.Center, New System.Windows.Point(Outline.Left + (Outline.Width / 2), -5), 3, 0)
@@ -1098,12 +1171,13 @@ Public Class Form1
             For Each p In Parameters
                 Select Case p.GetType
                     Case GetType(Int32) : PutInt(p)
-                    Case GetType(Double) : PutFloat(p)
+                    Case GetType(Float) : PutInt(p.value)
+                    Case GetType(OnOffSteps) : PutInt(p)
                     Case GetType(System.Collections.Generic.List(Of OnOffSteps))
                         For Each s In p
                             PutInt(s.steps)
                         Next
-                    Case GetType(Acceleration_type), GetType(OnOff_type), GetType(Axis_type)
+                    Case GetType(Acceleration_Enum), GetType(OnOff_Enum), GetType(Axis_Enum)
                         PutInt(p)
                     Case Else
                         Throw New System.Exception($"WRITEMOL Parameter of unsupported type {p.GetType}")
@@ -1137,9 +1211,105 @@ Public Class Form1
         UseMCBLK = KeepOpen       ' Turn MCBLK buffering back on
     End Sub
 
+    Public Sub CutLinePrecise(delta As System.Windows.Point, speed As Double, acceleration As Double)
+        CutLinePrecise(CType(delta, IntPoint), speed, acceleration)       ' convert mm to steps
+    End Sub
+    Public Sub CutLinePrecise(delta As IntPoint, speed As Double, accel As Double)
+        ' Create a series of move commands from the current position by delta
+        ' Each move is a maximum of 0.1mm
+        ' The move is done in 3 phases
+        ' - Accelerate to speed
+        ' - Coast at speed
+        ' - Decelerate to stop
+        ' The movements are governed by the formula v2 = sqrt(v1^2 + 2as), where v1 is the initial speed, v2 is the final speed, a is the acceleration and s is the distance
+        Dim InitialSpeed = CInt(5 * xScale)    ' initial speed in steps/s
+        Dim CurrentSpeed As Integer = InitialSpeed
+        Dim TargetSpeed = CInt(speed * xScale)          ' maximum speed
+        Dim NextSpeed As Integer
+        Dim Acceleration = CInt(accel * xScale)   ' acceleration in steps/s
+        Dim Increment As Double = 0.1 * xScale
+        Dim moves As New List(Of (InitSpeed As Integer, MaxSpeed As Integer, dx As Integer, dy As Integer))
+        Dim CurrentPosition As IntPoint = ZERO      ' treat delta as vector, origin (0,0)
+        Dim NextPosition As IntPoint            ' position to move to
+        Dim TotalDistance As Double = delta.Length       ' total distance to move
+        Dim Ratio As Double
+        Dim AccelerateDistance As Double       ' distance required to achieve MaxSpeed
+        Dim CurrentDistance As Double
+        Dim MoveDelta As IntPoint               ' amount to move as a delta
+        Dim points As Integer                   ' which point along the line
 
-    Public Sub MoveRelativeSplit(p As System.Windows.Point, speed As Double)
-        MoveRelativeSplit(CType(p, IntPoint), speed)       ' convert mm to steps
+        ' Calculate the distance it would take to accelerate to speed if we did it in 1 step
+        AccelerateDistance = (TargetSpeed ^ 2 - InitialSpeed ^ 2) / (2 * Acceleration)    ' distance to accelerate to target speed
+        If AccelerateDistance * 2 > TotalDistance Then Throw New Exception($"Acceleration distance {AccelerateDistance / xScale:f1}mm is greater than half total distance {TotalDistance / xScale:f1}mm. Speed = {speed:f1}mm/s")       ' not enough distance to accelerate
+
+        ' Phase 1 - Accelerate until we reach speed
+        While CurrentSpeed < TargetSpeed
+            points = moves.Count + 1             ' which point are we calculating
+            Ratio = points * Increment / TotalDistance
+            NextPosition = New IntPoint(CInt(Ratio * delta.X), CInt(Ratio * delta.Y))
+            MoveDelta = NextPosition - CurrentPosition
+            NextSpeed = CInt(Math.Sqrt(CurrentSpeed ^ 2 + 2 * Acceleration * Increment))
+            NextSpeed = CInt(Math.Min(NextSpeed, TargetSpeed))        ' limit to TargetSpeed
+            moves.Add((InitSpeed:=CurrentSpeed, MaxSpeed:=NextSpeed, dx:=MoveDelta.X, dy:=MoveDelta.Y))
+            CurrentSpeed = NextSpeed
+            CurrentPosition = NextPosition
+            CurrentDistance = CurrentPosition.Length        ' distance travelled
+            If CurrentSpeed = TargetSpeed Then      ' reached target speed
+                Exit While
+            End If
+        End While
+        AccelerateDistance = CurrentDistance    ' the distance we required to accelerate
+
+        ' Phase 2 - coast until we reach time to decelerate
+        Do
+            points = moves.Count + 1             ' which point are we calculating
+            Ratio = points * Increment / TotalDistance
+            NextPosition = New IntPoint(CInt(Ratio * delta.X), CInt(Ratio * delta.Y))
+            MoveDelta = NextPosition - CurrentPosition
+            moves.Add((InitSpeed:=CurrentSpeed, MaxSpeed:=CurrentSpeed, dx:=MoveDelta.X, dy:=MoveDelta.Y))
+            CurrentPosition = NextPosition
+            CurrentDistance = CurrentPosition.Length       ' distance travelled
+        Loop Until CurrentDistance >= TotalDistance - AccelerateDistance
+
+        ' Phase 3 - Decelerate to stop
+        While CurrentSpeed > InitialSpeed
+            points = moves.Count + 1             ' which point are we calculating
+            NextSpeed = CInt(Math.Sqrt(Math.Max(CurrentSpeed ^ 2 - 2 * Acceleration * Increment, 0)))
+            Ratio = points * Increment / TotalDistance
+            NextPosition = New IntPoint(CInt(Ratio * delta.X), CInt(Ratio * delta.Y))
+            MoveDelta = NextPosition - CurrentPosition
+            moves.Add((InitSpeed:=CurrentSpeed, MaxSpeed:=NextSpeed, dx:=MoveDelta.X, dy:=MoveDelta.Y))
+            CurrentSpeed = NextSpeed
+            CurrentPosition = NextPosition
+        End While
+        position = CurrentPosition      ' update position
+
+        ' post calc check - that total dx,dy matches requested
+        'Dim dxtotal As Integer = 0, dytotal As Integer = 0
+        'For Each Move As (InitSpeed As Integer, MaxSpeed As Integer, dx As Integer, dy As Integer) In moves
+        '    dxtotal += Move.dx
+        '    dytotal += Move.dy
+        'Next
+        'If dxtotal <> delta.X Or dytotal <> delta.Y Then
+        '    Throw New System.Exception($"CutLine: Calculated distance {dxtotal},{dytotal} does not match requested {delta.X},{delta.Y}")
+        'End If
+
+        ' Execute the moves
+        For Each Move As (InitSpeed As Integer, MaxSpeed As Integer, dx As Integer, dy As Integer) In moves
+            If Move.MaxSpeed > Move.InitSpeed Then
+                WriteMOL(MOL_ACCELERATION, {Acceleration_Enum.Accelerate})      ' we are accelerating
+                WriteMOL(MOL_SETSPD, {Float.Encode(Move.InitSpeed), Float.Encode(Move.MaxSpeed), Float.Encode(accel * xScale)})
+            ElseIf Move.MaxSpeed < Move.InitSpeed Then
+                WriteMOL(MOL_ACCELERATION, {Acceleration_Enum.Decelerate})      ' we are decelerating
+                WriteMOL(MOL_SETSPD, {Float.Encode(Move.MaxSpeed), Float.Encode(Move.InitSpeed), Float.Encode(accel * xScale)})
+            Else
+                WriteMOL(MOL_SETSPD, {Float.Encode(Move.MaxSpeed), Float.Encode(Move.MaxSpeed), Float.Encode(accel * xScale)})
+            End If
+            WriteMOL(MOL_MVREL, {772, Move.dx, Move.dy})
+        Next
+    End Sub
+    Public Sub MoveRelativeSplit(delta As System.Windows.Point, speed As Double)
+        MoveRelativeSplit(CType(delta, IntPoint), speed)       ' convert mm to steps
     End Sub
     Public Sub MoveRelativeSplit(delta As IntPoint, speed As Double)
         ' Create a move command from the current position to p
@@ -1156,7 +1326,7 @@ Public Class Form1
         Dim T = (speed - StartSpeed) / Accel       ' T =(max speed-initial speed)/acceleration time taken to reach QuickSpeed
         Dim S As Integer = CInt(StartSpeed * T + xScale * 0.5 * Accel * T ^ 2)  ' s=ut+0.5t*t  distance (steps) travelled whilst reaching this speed
         ' Calculate 2 or 3 part move
-        Dim Dist = Math.Sqrt(delta.X ^ 2 + delta.Y ^ 2)         ' distance to move
+        Dim Dist = delta.Length         ' distance to move
 
         If S > Dist / 2 Or Not LaserIsOn Then
             ' we can get more than halfway if we needed, so 2 pieces enough
@@ -1178,13 +1348,13 @@ Public Class Form1
 
         For m = 0 To moves.Count - 1
             If m = 0 Then    ' the first one
-                WriteMOL(MOL_ACCELERATION, {Acceleration_type.Accelerate})
-                WriteMOL(MOL_SETSPD, {StartSpeed * xScale, speed * xScale, Accel * xScale})
+                WriteMOL(MOL_ACCELERATION, {Acceleration_Enum.Accelerate})
+                WriteMOL(MOL_SETSPD, {Float.Encode(StartSpeed * xScale), Float.Encode(speed * xScale), Float.Encode(Accel * xScale)})
             ElseIf m = moves.Count - 1 Then    ' the last one
-                WriteMOL(MOL_ACCELERATION, {Acceleration_type.Decelerate})
-                WriteMOL(MOL_SETSPD, {StartSpeed * xScale, speed * xScale, Accel * xScale})
+                WriteMOL(MOL_ACCELERATION, {Acceleration_Enum.Decelerate})
+                WriteMOL(MOL_SETSPD, {Float.Encode(StartSpeed * xScale), Float.Encode(speed * xScale), Float.Encode(Accel * xScale)})
             Else
-                WriteMOL(MOL_SETSPD, {speed * xScale, speed * xScale, Accel * xScale})     ' Quick speed in the middle section
+                WriteMOL(MOL_SETSPD, {Float.Encode(speed * xScale), Float.Encode(speed * xScale), Float.Encode(Accel * xScale)})
             End If
             WriteMOL(MOL_MVREL, {772, moves(m).X, moves(m).Y})
         Next
@@ -1192,7 +1362,7 @@ Public Class Form1
 
     End Sub
 
-    Public Sub DrawBox(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, Layer As Layer, Optional shaded As Boolean = False, Optional power As Integer = 0, Optional speed As Double = 300)
+    Public Sub DrawBox(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, Layer As Layer, Optional shaded As Boolean = False, Optional power As Integer = 0, Optional speed As Double = 150)
         ' Draw a box
         ' outline is a rect defining the box in steps
         ' power as %
@@ -1225,19 +1395,26 @@ Public Class Form1
                 DXF_line(position, position + delta, MoveLayer)
                 MoveRelativeSplit(delta, QuickSpeed)        ' Move to start of box (BottomRight) in 2 pieces
             End If
-            WriteMOL(MOL_PWRSPD5, {power * 100, power * 100, 5 * xScale, speed * xScale, 0.0})    ' set power & speed
+            WriteMOL(MOL_PWRSPD5, {power * 100, power * 100, Float.Encode(5 * xScale), Float.Encode(speed * xScale), Float.Encode(0.0)})    ' set power & speed
             UseMCBLK = True     ' open MCB
             WriteMOL(&H1000B06, {&H201})        ' Unknown magic command
             ' Ordinary box with 4 sides
-            If power > 0 Then      ' laser on if not TEST box
-                WriteMOL(MOL_LASER, {OnOff_type.[On]})
-                LaserIsOn = True
+            Dim block = GetBlockType(writer.BaseStream.Position)    ' get block type   
+            If block = BLOCKTYPE.DRAW Or block = BLOCKTYPE.CUT Then WriteMOL(MOL_LASER, {OnOff_Enum.[On]}) : LaserIsOn = True
+            If block = BLOCKTYPE.DRAW Then
+                ' We are cutting, so use precise cut line
+                CutLinePrecise(New IntPoint(-outline.Width * xScale, 0), speed, WorkAcc)
+                CutLinePrecise(New IntPoint(0, -outline.Height * yScale), speed, WorkAcc)
+                CutLinePrecise(New IntPoint(outline.Width * xScale, 0), speed, WorkAcc)
+                CutLinePrecise(New IntPoint(0, outline.Height * yScale), speed, WorkAcc)
+            Else
+                ' Use quick and dirty method to move/cut
+                MoveRelativeSplit(New System.Windows.Point(-outline.Width, 0), speed)
+                MoveRelativeSplit(New System.Windows.Point(0, -outline.Height), speed)
+                MoveRelativeSplit(New System.Windows.Point(outline.Width, 0), speed)
+                MoveRelativeSplit(New System.Windows.Point(0, outline.Height), speed)
             End If
-            MoveRelativeSplit(New System.Windows.Point(-outline.Width, 0), speed)
-            MoveRelativeSplit(New System.Windows.Point(0, -outline.Height), speed)
-            MoveRelativeSplit(New System.Windows.Point(outline.Width, 0), speed)
-            MoveRelativeSplit(New System.Windows.Point(0, outline.Height), speed)
-            If LaserIsOn Then WriteMOL(MOL_LASER, {OnOff_type.Off}) : LaserIsOn = False     ' Turn laser off
+            If LaserIsOn Then WriteMOL(MOL_LASER, {OnOff_Enum.Off}) : LaserIsOn = False     ' Turn laser off
             FlushMCBLK(False)       ' close MCB
             WriteMOL(&H1000B06, {&H200})        ' Unknown magic command
             WriteMOL(&H1000B06, {&H200})        ' Unknown magic command
@@ -1283,9 +1460,9 @@ Public Class Form1
             Steps.OffSteps = 0
             WriteMOL(MOL_ENGACD, {engacd})     ' define the acceleration start distance
             WriteMOL(&H1000246, {0})            ' unknown
-            WriteMOL(MOL_ENGSPD, {Axis_type.X, speed * xScale})          ' define speed
+            WriteMOL(MOL_ENGSPD, {Axis_Enum.X, Float.Encode(speed * xScale)})          ' define speed
             WriteMOL(&H2010041, {3, &HB6C3000})     ' unknown
-            WriteMOL(MOL_PWRSPD5, {power * 100, power * 100, 0.0, speed * xScale, 0.0})
+            WriteMOL(MOL_PWRSPD5, {power * 100, power * 100, Float.Encode(0.0), Float.Encode(speed * xScale), Float.Encode(0.0)})
             WriteMOL(MOL_ENGPWR, {power * 100})             ' define power
             WriteMOL(&H1000B46, {&H201})                    ' unknown
             Dim OnOffTotal As Integer = engacd * 2 + Steps.OnSteps + Steps.OffSteps
@@ -1295,7 +1472,7 @@ Public Class Form1
             Dim YInc As New IntPoint(0, My.Settings.Interval * yScale)  ' Y increment steps
             While height < outline.Height * xScale     ' do until we reach cell height
                 WriteMOL(MOL_ENGLSR, {1, New List(Of OnOffSteps) From {{Steps}}})      ' one full line of on/off
-                WriteMOL(MOL_ENGMVX, {Axis_type.X, OnOffTotal * direction})
+                WriteMOL(MOL_ENGMVX, {Axis_Enum.X, OnOffTotal * direction})
                 ' The ENGMVX movement occurs in 3 phases. Accelerate, OnOff steps, Decelerate. Need to backup for the Accelerate phase
                 Dim accdelta = New IntPoint(engacd * direction, 0)
                 DXF_line(position, position + accdelta, EngraveMoveLayer)      ' Accelerate
@@ -1306,12 +1483,13 @@ Public Class Form1
                 DXF_line(position, position + accdelta, EngraveMoveLayer)      ' Decelerate same as accelerate
                 position += accdelta
                 ' Handle Y movement
-                WriteMOL(MOL_ENGMVY, {Axis_type.Y, YInc.Y})
+                WriteMOL(MOL_ENGMVY, {Axis_Enum.Y, YInc.Y})
                 DXF_line(position, position + YInc, EngraveMoveLayer)
                 position += YInc
                 direction *= -1           ' reverse direction for next line
                 height += YInc.Y     ' move up to next line
             End While
+            WriteMOL(&H1000B46, {&H200})         ' unknown command
         End If
     End Sub
 
@@ -1354,21 +1532,21 @@ Public Class Form1
             End If
 
             ' Set speed and power for text
-            WriteMOL(MOL_PWRSPD5, {TextPower * 100, TextPower * 100, TextSpeed * xScale, TextSpeed * xScale, 0.0})    ' set power & speed
+            WriteMOL(MOL_PWRSPD5, {TextPower * 100, TextPower * 100, Float.Encode(TextSpeed * xScale), Float.Encode(TextSpeed * xScale), Float.Encode(0.0)})    ' set power & speed
             ' Get to the start position of this stroke
             Dim delta As IntPoint = StartPoint - position
             If delta <> ZERO Then
                 DXF_line(position, position + delta, MoveLayer)
                 MoveRelativeSplit(delta, TextSpeed)      ' move in 2 segments
             End If
-            WriteMOL(MOL_LASER, {OnOff_type.[On]})
+            WriteMOL(MOL_LASER, {OnOff_Enum.[On]})
             ' Process all vertexes, except the first
             For p = 1 To stroke.Vertexes.Count - 1
                 Dim thispoint = New IntPoint(stroke.Vertexes(p).Position.X, stroke.Vertexes(p).Position.Y)
                 delta = thispoint - position
                 MoveRelativeSplit(delta, TextSpeed)          ' draw stroke
             Next
-            WriteMOL(MOL_LASER, {OnOff_type.Off})
+            WriteMOL(MOL_LASER, {OnOff_Enum.Off})
         Next
         FlushMCBLK(False)
     End Sub
@@ -1397,10 +1575,10 @@ Public Class Form1
             }
         Dim TestCases() = {208.3218, 800, 0, 1000.0, -1000.0, -1.0, 1.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, -0.1, -2, 2, 10, -10, 0.9, 10.0 ^ 4, 10.0 ^ 5, 10.0 ^ 7, 10.0 ^ 8}
 
-        TextBox1.AppendText($"Round trip discrepancy for 0.1 is {Leetro2Float(Float2Leetro(0.1))}{vbCrLf}")
+        TextBox1.AppendText($"Round trip discrepancy for 0.1 is {Float2Double(Double2Float(0.1))}{vbCrLf}")
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
         For i = 0.1 To 1 Step 0.1
-            Dim n = Float2Leetro(i)
+            Dim n = Double2Float(i)
             TextBox1.AppendText($"{i:f1}  0x{n:x8} Sign={(n >> 23) And 1} exp={(n >> 24) And &HFF - 256} Mantissa={n And &H7FFFFF}{vbCrLf}")
         Next
         ' Test known cases
@@ -1408,8 +1586,8 @@ Public Class Form1
         For Each t In KnownEquivalents
             Dim IEEE = t.IEEE
             Dim Leetro = t.Leetro 'And &HFFFFFE00
-            Dim toIEEE = Leetro2Float(Leetro)
-            Dim toLeetro = Float2Leetro(IEEE)
+            Dim toIEEE = Float2Double(Leetro)
+            Dim toLeetro = Double2Float(IEEE)
             'Dim toIEEE = LeetroToIEEE(Leetro)
             'Dim toLeetro = IEEEToLeetro(IEEE)
             TextBox1.AppendText($"IEEE {IEEE:f4} <=> Leetro 0x{Leetro:x8}: ")
@@ -1421,8 +1599,8 @@ Public Class Form1
         TextBox1.AppendText($"Random test cases{vbCrLf}")
         For Each t In TestCases
             TextBox1.AppendText($"Testcase {t}: ")
-            Dim ToInt = Float2Leetro(t)
-            Dim FromInt As Double = Leetro2Float(ToInt)
+            Dim ToInt = Double2Float(t)
+            Dim FromInt As Double = Float2Double(ToInt)
             If Math.Abs(t - FromInt) < 0.1 Then
                 TextBox1.AppendText("Success")
             Else
@@ -1566,46 +1744,6 @@ Public Class Form1
         My.Computer.FileSystem.WriteAllBytes("minimario.MOL", bytes, False)
     End Sub
 
-    Private Sub CommandSummaryToolStripMenuItem_Click(sender As Object, e As EventArgs)
-        ' produce a summary of all command
-        TextBox1.AppendText($"Command summary{vbCrLf}{vbCrLf}")
-        TextBox1.AppendText($"{"HEX value",-12}{"Mnemonic",-15}  Parameters (name is type){vbCrLf}")
-        ' Sort dictionary by low 24 bits
-        Dim sorted = From item In Commands
-                     Order By item.Key And &HFFFFFF
-                     Select item
-        For Each cmd In sorted
-            TextBox1.AppendText($"0x{cmd.Key:x8}  {cmd.Value.Mnemonic,-15}  ")
-            'now parameters
-            Dim parameters = New List(Of String)
-            For Each p In cmd.Value.Parameters
-                parameters.Add($"{p.Name} is {p.Typ.Name}")
-            Next
-            TextBox1.AppendText(String.Join(", ", parameters.ToArray))
-            TextBox1.AppendText($"{vbCrLf}")
-        Next
-        ' Custom types. Display details of any parameters that are defined using ENUM. These are used when a basetype won't do
-        Dim CustomTypes As New List(Of Type)
-        For Each cmd In Commands       ' search all commands
-            For Each p In cmd.Value.Parameters  ' searcg all parameters
-                If p.Typ.BaseType.Name = "Enum" Then    ' Add any non standand types to list
-                    If Not CustomTypes.Contains(p.Typ) Then CustomTypes.Add(p.Typ)
-                End If
-            Next
-        Next
-        ' Display list of custom types
-        TextBox1.AppendText($"{vbCrLf}Custom types{vbCrLf}")
-        For Each ct In CustomTypes
-            Dim enums As New List(Of String)
-            For Each value In [Enum].GetValues(ct)     ' extract name and value of type
-                Dim name = value.ToString
-                Dim valu = CInt(value).ToString
-                enums.Add($"{name}={valu}")
-            Next
-            TextBox1.AppendText($"{ct.Name,-25} {String.Join(",", enums)}{vbCrLf}")
-        Next
-    End Sub
-
     Private Sub DisassembleToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles DisassembleToolStripMenuItem.Click
         With dlg
             .Filter = "MOL file|*.mol|All files|*.*"
@@ -1623,14 +1761,21 @@ Public Class Form1
             Dim Basename = System.IO.Path.GetFileNameWithoutExtension(dlg.filename)
             Dim textname = $"{Basename}.txt"
             TextFile = My.Computer.FileSystem.OpenTextFileWriter(textname, False)
+            TextFile.AutoFlush = True
             ' DISASSEMBLE everything
             TextFile.WriteLine($"Disassembly of {dlg.filename} on {Now}")
+            ' retrieve list of draw chunks
+            Dim Chunk = GetInt(&H7C)        ' first draw chunk
+            While Chunk <> 0
+                DrawChunks.Add(Chunk)
+                Chunk = GetInt()
+            End While
             DisplayHeader(TextFile)
-            DecodeStream(TextFile, BLOCKTYPE.CONFIG, ConfigChunk * BLOCK_SIZE)
-            DecodeStream(TextFile, BLOCKTYPE.TEST, TestChunk * BLOCK_SIZE)
-            DecodeStream(TextFile, BLOCKTYPE.CUT, CutChunk * BLOCK_SIZE)
-            For Each chunk In DrawChunks
-                DecodeStream(TextFile, BLOCKTYPE.DRAW, chunk * BLOCK_SIZE)
+            DecodeStream(TextFile, ConfigChunk * BLOCK_SIZE)
+            DecodeStream(TextFile, TestChunk * BLOCK_SIZE)
+            DecodeStream(TextFile, CutChunk * BLOCK_SIZE)
+            For Each Chunk In DrawChunks
+                DecodeStream(TextFile, Chunk * BLOCK_SIZE)
             Next
             ' Display command usage
             TextFile.WriteLine()
@@ -1641,6 +1786,8 @@ Public Class Form1
                 If Commands.TryGetValue(cmd.Key, value) Then decode = value.Mnemonic Else decode = $"0x{cmd.Key:x8}"
                 TextFile.WriteLine($"{decode}  {cmd.Value}")
             Next
+
+            ' Other metrics
 
             TextFile.Close()
             reader.Close()
@@ -1675,7 +1822,6 @@ Public Class Form1
         If result.OK Then
             ' Init internal variables
             Initialise()
-            DrawChunks.Clear()
 
             position = ZERO
             TextBox1.Clear()
@@ -1683,6 +1829,7 @@ Public Class Form1
             reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
 
             ' Get critical parameters from header
+            FileSize = GetInt(0)
             TopRight = New IntPoint(GetInt(&H18), GetInt())
             BottomLeft = New IntPoint(GetInt(&H20), GetInt())
             ConfigChunk = GetInt(&H70)
@@ -1698,8 +1845,8 @@ Public Class Form1
             ' Harvest subroutine start addresses
             ' Look at the first instruction of each block. BEGSUBa instruction there has the SUBR number
             Dim blocks As New List(Of Integer) From {
-                2,      ' TEST
-                3       ' CUT
+                TestChunk,      ' TEST
+                CutChunk       ' CUT
             }
             For Each b In DrawChunks
                 blocks.Add(b)
@@ -1707,7 +1854,7 @@ Public Class Form1
             For Each block In blocks
                 Dim addr = block * BLOCK_SIZE
                 Dim n = GetInt(addr)
-                If n <> MOL_BEGSUB And n <> MOL_BEGSUBa Then Throw New System.Exception($"Block {block} does not start with a BEGSUB or BEGSUBa command")
+                If n <> MOL_BEGSUB And n <> MOL_BEGSUBa Then Throw New System.Exception($"Block {block} @ 0x{addr:x} does not start with a BEGSUB or BEGSUBa command")
                 n = GetInt()    ' the subroutine number
                 SubrAddrs.Add(n, addr)
             Next
@@ -1724,24 +1871,24 @@ Public Class Form1
                 ChunksWithCode.Add(s, False)
             Next
             MVRELInConfig = 0
-            Stack.Push((addr:=0, blk:=BLOCKTYPE.TEST, lyr:=TestLayer))   ' any old rubbish to keep ENDSUB happy
+            Stack.Push((addr:=0, lyr:=TestLayer))   ' any old rubbish to keep ENDSUB happy
             position = ZERO      ' this block has an origin of (0,0)
-            ExecuteStream(BLOCKTYPE.TEST, TestChunk * BLOCK_SIZE, dxf, TestLayer)   ' test
+            ExecuteStream(TestChunk * BLOCK_SIZE, dxf, TestLayer)   ' test
 
-            Stack.Push((addr:=0, blk:=BLOCKTYPE.CUT, lyr:=CutLayer))   ' any old rubbish to keep ENDSUB happy
+            Stack.Push((addr:=0, lyr:=CutLayer))   ' any old rubbish to keep ENDSUB happy
             position = ZERO      ' this block has an origin of (0,0)
-            ExecuteStream(BLOCKTYPE.CUT, CutChunk * BLOCK_SIZE, dxf, CutLayer)   ' cut
+            ExecuteStream(CutChunk * BLOCK_SIZE, dxf, CutLayer)   ' cut
 
-            Stack.Push((addr:=0, blk:=BLOCKTYPE.CONFIG, lyr:=ConfigLayer))   ' any old rubbish to keep ENDSUB happy
+            Stack.Push((addr:=0, lyr:=ConfigLayer))   ' any old rubbish to keep ENDSUB happy
             position = ZERO      ' this block has an origin of (0,0)
-            ExecuteStream(BLOCKTYPE.CONFIG, ConfigChunk * BLOCK_SIZE, dxf, ConfigLayer)   ' config (which calls everything else)
+            ExecuteStream(ConfigChunk * BLOCK_SIZE, dxf, ConfigLayer)   ' config (which calls everything else)
 
             ' Now execute any that weren't called from config
             For Each s In ChunksWithCode
                 If Not s.Value Then
-                    Stack.Push((addr:=0, blk:=BLOCKTYPE.DRAW, lyr:=DrawLayer))   ' any old rubbish to keep ENDSUB happy
+                    Stack.Push((addr:=0, lyr:=DrawLayer))   ' any old rubbish to keep ENDSUB happy
                     position = ZERO      ' this block has an origin of (0,0)
-                    ExecuteStream(BLOCKTYPE.DRAW, s.Key * BLOCK_SIZE, dxf, DrawLayer)   ' config (which calls everything else)
+                    ExecuteStream(s.Key * BLOCK_SIZE, dxf, DrawLayer)   ' config (which calls everything else)
                 End If
             Next
 
@@ -1845,9 +1992,13 @@ Public Class Form1
 
     Private Sub ConvertLeetroToIEEEToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConvertLeetroToIEEEToolStripMenuItem.Click
         Dim hex As String = InputBox("Input Leetro float in hex format", "")
-        Dim value As UInt32 = Convert.ToUInt32(hex, 16)
-        Dim float = Leetro2Float(value)
-        MsgBox($"The value of 0x{hex} as a Leetro float is {float}", vbInformation + vbOKOnly, "Conversion to float")
+        Try
+            Dim value As UInt32 = Convert.ToUInt32(hex, 16)
+            Dim float = Float2Double(value)
+            MsgBox($"The value of 0x{hex} as a Leetro float is {float}", vbInformation + vbOKOnly, "Conversion to float")
+        Catch ex As Exception
+            MsgBox($"Invalid input. {ex.Message}", vbExclamation + vbOKOnly, "Error")
+        End Try
     End Sub
     Enum ReaderState
         Idle
@@ -2169,25 +2320,29 @@ Public Class Form1
                      Order By item.Key And &HFFFFFF
                      Select item
         For Each c In sorted
-            worksheet.Cells(row, 0).Value = $"0x{c.Key:x8}"
-            worksheet.Cells(row, 1).Value = c.Value.Mnemonic
-            worksheet.Cells(row, 2).Value = c.Value.Description
-            Dim pNum = 1
-            For Each p In c.Value.Parameters
-                worksheet.Cells(row, 3).Value = $"p{pNum}"
-                worksheet.Cells(row, 4).Value = p.Description
-                worksheet.Cells(row, 5).Value = p.Name
+            ' Populate the rows
+            worksheet.Rows(row).Cells("A").Value = $"0x{c.Key:x8}"
+            worksheet.Rows(row).Cells("B").Value = c.Value.Mnemonic
+                worksheet.Rows(row).Cells("C").Value = c.Value.Description
+                Dim pNum = 1
+                For Each p In c.Value.Parameters
+                    worksheet.Rows(row).Cells("D").Value = $"p{pNum}"
+                    worksheet.Rows(row).Cells("E").Value = p.Description
+                    worksheet.Rows(row).Cells("F").Value = p.Name
                 Dim typ = p.Typ.ToString
+                If typ.StartsWith("MOL.") Then typ = typ.Substring(4)    ' remove MOL qualifier
                 Select Case typ
-                    Case "System.Int32" : typ = "Integer"
-                    Case "System.Double" : typ = "Float"
-                End Select
-                worksheet.Cells(row, 6).Value = typ
-                worksheet.Cells(row, 7).Value = p.Scale
-                worksheet.Cells(row, 8).Value = p.Units
-                pNum += 1
-                row += 1
-            Next
+                        Case "System.Int32" : typ = "Int32"
+                    Case "System.Collections.Generic.List`1[MOL.OnOffSteps]" : typ = "List(Of OnOffSteps)"
+                    End Select
+                    worksheet.Rows(row).Cells("G").Value = typ
+                    worksheet.Rows(row).Cells("H").Value = p.Scale
+                    worksheet.Rows(row).Cells("I").Value = p.Units
+
+                    pNum += 1
+                    row += 1
+                Next
+
             ' if more than 1 parameter, then merge cols A,B,C for this command
             Dim pars = c.Value.Parameters.Count
             If pars > 1 Then
@@ -2202,12 +2357,46 @@ Public Class Form1
             End If
             row += 1
         Next
+        worksheet.Columns("H").Style.NumberFormat = NumberFormatBuilder.Number(5)      ' show 5 dec places in scale column
         ' Autofit column width
         Dim columnCount = worksheet.CalculateMaxUsedColumns()
         For i As Integer = 0 To columnCount - 1
             worksheet.Columns(i).AutoFit(1, worksheet.Rows(1), worksheet.Rows(worksheet.Rows.Count - 1))
         Next
-        ' Save the file
+
+        ' Now create list of Enums
+        Dim EnumSheet As ExcelWorksheet = workbook.Worksheets.Add("Enums")
+        EnumSheet.Rows("1").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+        ' Custom types. Display details of any parameters that are defined using ENUM. These are used when a basetype won't do
+        Dim CustomTypes As New List(Of Type)
+        For Each cmd In Commands       ' search all commands
+            For Each p In cmd.Value.Parameters  ' search all parameters
+                If p.Typ.BaseType.Name = "Enum" Then    ' Add any non standand types to list
+                    If Not CustomTypes.Contains(p.Typ) Then CustomTypes.Add(p.Typ)
+                End If
+            Next
+        Next
+        ' Display list of custom types
+        EnumSheet.Cells("A1").Value = "Custom types"
+        row = 2
+        For Each ct In CustomTypes
+            Dim enums As New List(Of String)
+            For Each value In [Enum].GetValues(ct)     ' extract name and value of type
+                Dim name = value.ToString
+                Dim valu = CInt(value).ToString
+                enums.Add($"{name}={valu}")
+            Next
+            EnumSheet.Rows(row).Cells("A").Value = ct.Name
+            EnumSheet.Rows(row).Cells("B").Value = $"{String.Join(", ", enums)}"
+            row += 1
+        Next
+        ' Autofit column width
+        columnCount = EnumSheet.CalculateMaxUsedColumns()
+        For i As Integer = 0 To columnCount - 1
+            EnumSheet.Columns(i).AutoFit(1, EnumSheet.Rows(1), EnumSheet.Rows(EnumSheet.Rows.Count - 1))
+        Next
+
+        ' Save the workbook
         workbook.Save("commands.ods")
         TextBox1.AppendText($"Done{vbCrLf}")
     End Sub
@@ -2216,4 +2405,36 @@ Public Class Form1
         ' Convert row, col to A1 style reference
         Return Chr(Asc("A") + col) & row + 1
     End Function
+
+    Private Sub TestCutlineToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles TestCutlineToolStripMenuItem.Click
+        Dim buffer() As Byte
+        writer = New BinaryWriter(System.IO.File.Open("TestCutLine.mol", FileMode.Create), System.Text.Encoding.Unicode, False)
+
+        ' Copy the first 5 blocks of a template file to initialise the new MOL file
+        Dim ReadStream = System.IO.File.Open("line_d_10.MOL", FileMode.Open)           ' file containing template blocks
+        reader = New BinaryReader(ReadStream, System.Text.Encoding.Unicode, False)
+        writer.Seek(0, SeekOrigin.Begin)            ' set reader to start of file
+        buffer = reader.ReadBytes(BLOCK_SIZE)      ' read header
+        writer.Seek(0, SeekOrigin.Begin)            ' set writer to start of file
+        writer.Write(buffer)                    ' write to new file
+        buffer = reader.ReadBytes(BLOCK_SIZE)      ' read config
+        writer.Write(buffer)                    ' write to new file
+        buffer = reader.ReadBytes(BLOCK_SIZE)      ' read TEST
+        writer.Write(buffer)                    ' write to new file
+        buffer = reader.ReadBytes(BLOCK_SIZE)      ' read CUT
+        writer.Write(buffer)                    ' write to new file
+        buffer = reader.ReadBytes(BLOCK_SIZE)      ' read empty block
+        writer.Write(buffer)                    ' write to new file
+        reader.Close()
+        ReadStream.Close()
+
+        writer.BaseStream.Position = 5 * BLOCK_SIZE
+        ' Now write the cutline
+        position = New IntPoint(100, 200)
+        delta = New IntPoint(6000, 8000)
+        CutLinePrecise(delta, 50, 500)
+        WriteMOL(MOL_END)
+        writer.Close()
+        TextBox1.AppendText("Done")
+    End Sub
 End Class
