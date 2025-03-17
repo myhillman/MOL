@@ -3,7 +3,6 @@ Imports System.IO
 Imports System.Runtime.InteropServices
 Imports System.Windows
 Imports System.Windows.Documents
-Imports System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar
 Imports System.Windows.Media
 Imports netDxf
 Imports netDxf.Entities
@@ -17,7 +16,7 @@ Imports GemBox.Spreadsheet
 ' Create a pseudo type to handle Leetro floating point numbers in a more natural way
 ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
 Public Structure Float
-    Private ReadOnly value As Integer
+    Public ReadOnly value As Integer
     ' Constructor to initialize from a double
     Public Sub New(d As Double)
         value = Double2Float(d)
@@ -278,8 +277,6 @@ Public Class Form1
     Private Const MOL_UNKNOWN07 = &H3046040      ' unknown command refered to in London Hackspace documents
     Private Const MOL_UNKNOWN09 = &H326040      ' unknown command refered to in London Hackspace documents
 
-    Private Const MOL_ENGLSR1 = &H80000A46
-
     ' Dictionary of all commands
     Private Commands As New SortedDictionary(Of Integer, LASERcmd) From {
         {MOL_MVREL, New LASERcmd("MVREL", "Move the cutter by dx,dy", ParameterCount.FIXED, New List(Of Parameter) From {
@@ -353,9 +350,9 @@ Public Class Form1
                          )},
         {MOL_LASER, New LASERcmd("LASER", "Laser on or off control", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("On/Off", "On or Off", GetType(OnOff_Enum))}})},
-        {MOL_LASER1, New LASERcmd("LASER1", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(Int32))}})},
-        {MOL_LASER2, New LASERcmd("LASER2", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(Int32))}})},
-        {MOL_LASER3, New LASERcmd("LASER3", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(Int32))}})},
+        {MOL_LASER1, New LASERcmd("LASER1", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
+        {MOL_LASER2, New LASERcmd("LASER2", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
+        {MOL_LASER3, New LASERcmd("LASER3", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
         {MOL_GOSUB, New LASERcmd("GOSUB", "Call a subroutine with no parameters", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "Number of the subroutine", GetType(Int32))}
                             }
@@ -415,10 +412,6 @@ Public Class Form1
                     {New Parameter("x", "distance", GetType(Int32), 1 / xScale, "mm")}}
                     )},
         {MOL_ENGLSR, New LASERcmd("ENGLSR", "Engraving On/Off pattern", ParameterCount.VARIABLE, New List(Of Parameter) From {
-                            {New Parameter("List of steps", "List of On/Off patterns", GetType(List(Of OnOffSteps)), 1 / xScale, "mm")}
-                            }
-                           )},
-        {MOL_ENGLSR1, New LASERcmd("ENGLSR1", "Engraving On/Off pattern", ParameterCount.VARIABLE, New List(Of Parameter) From {
                             {New Parameter("List of steps", "List of On/Off patterns", GetType(List(Of OnOffSteps)), 1 / xScale, "mm")}
                             }
                            )},
@@ -686,7 +679,7 @@ Public Class Form1
                         Dim SubBlock = DrawChunks(MVRELInConfig)      ' get chunk for this draw block
                         Dim bookmark = reader.BaseStream.Position         ' remember posn in decode stream
                         Dim subr = GetInt(SubBlock * BLOCK_SIZE + 4)          ' get the subroutine number
-                        Dim abs = (MVRELInConfig = 0)             ' first is absolute, other are relative
+                        Dim abs = (MVRELInConfig = 0)       ' first is absolute, other are relative
                         StartPosns.Add(subr, (abs, delta))              ' add subroutine start address
                         reader.BaseStream.Position = bookmark                 ' restore reader position
                         MVRELInConfig += 1
@@ -723,40 +716,49 @@ Public Class Form1
                 EngSpeed = GetFloat() / xScale
 
             Case MOL_ENGMVX   ' Engrave move X  (laser on and off)
-                GetInt()      ' consume Axis parameter
+                Dim axis = GetInt()      ' consume Axis parameter
+                If axis <> Axis_Enum.X Then Throw New Exception($"MOL_ENGMVX: Axis value {axis} is not valid @0x{addr:x}")
                 ' ENGMVX is in 3 phases, Accelerate, Engrave, Decelerate
-                Dim TotalSteps = GetInt()
-                Dim direction = Math.Sign(TotalSteps)     ' 1=LtoR, -1=RtoL
-                If direction = 0 Then direction = 1
+                Dim posn = position         ' use local copy of position
+                Dim TravelDist = GetInt()       ' the total travel distance for this operation
+                If TravelDist = 0 Then Throw New Exception($"MOL_ENGMVX: TravelDist is zero @0x{addr:x}")
+                Dim direction = Math.Sign(TravelDist)     ' 1=LtoR, -1=RtoL
                 ' Move for the initial acceleration
                 Dim delta As New IntPoint(AccelLength * direction, 0)
-                DXF_line(position, position + delta, MoveLayer)
-                position += delta
+                DXF_line(posn, posn + delta, MoveLayer)
+                posn += delta
                 ' do On/Off steps
                 For Each stp In ENGLSRsteps
                     ' The On portion of the delta
-                    delta = New IntPoint(stp.OnSteps * direction, 0)    ' delta in X direction
-                    DXF_line(position, position + delta, EngraveLayer, PowerSpeedColor(EngPower, EngSpeed))     ' color set to represent engrave shade
-                    position += delta
+                    If stp.OnSteps <> 0 Then
+                        delta = New IntPoint(stp.OnSteps * direction, 0)    ' delta in X direction
+                        DXF_line(posn, posn + delta, EngraveLayer, PowerSpeedColor(EngPower, EngSpeed))     ' color set to represent engrave shade
+                        posn += delta
+                    End If
                     ' The Off portion of the delta
-                    delta = New IntPoint(stp.OffSteps * direction, 0)    ' delta in X direction
-                    If delta <> ZERO Then DXF_line(position, position + delta, MoveLayer)
-                    position += delta
+                    If stp.OffSteps <> 0 Then
+                        delta = New IntPoint(stp.OffSteps * direction, 0)    ' delta in X direction
+                        DXF_line(posn, posn + delta, MoveLayer)
+                        posn += delta
+                    End If
                 Next
                 ' delta for the deceleration
                 delta = New IntPoint(AccelLength * direction, 0)
-                DXF_line(position, position + delta, MoveLayer)
+                DXF_line(posn, posn + delta, MoveLayer)
+                delta = New IntPoint(TravelDist, 0)
                 position += delta       ' move the position along
                 ENGLSRsteps.Clear()     ' clear the steps
 
             Case MOL_ENGMVY     ' Engrave move Y (laser off)
                 Dim axis = GetInt()      ' consume Axis parameter
+                If axis <> Axis_Enum.Y Then Throw New Exception($"MOL_ENGMVY: Axis value {axis} is not valid @0x{addr:x}")
                 Dim dy = GetInt()
+                If dy = 0 Then Throw New Exception($"MOL_ENGMVY: dy is zero @0x{addr:x}")
                 Dim delta As New IntPoint(0, dy)    ' move in Y direction
                 DXF_line(position, position + delta, MoveLayer)
                 position += delta      ' move position along
 
-            Case MOL_ENGLSR, MOL_ENGLSR1     ' engraving movement
+            Case MOL_ENGLSR     ' engraving movement
                 'ENGLSRsteps.Clear()
                 For i = 1 To nWords
                     Steps.Steps = GetInt()      ' get 2 16 bit values, accessable through OnSteps & OffSteps
@@ -848,11 +850,11 @@ Public Class Form1
         Select Case addr
             Case 0 To BLOCK_SIZE - 1
                 Return BLOCKTYPE.HEADER
-            Case ConfigChunk * BLOCK_SIZE To (ConfigChunk + 1) * BLOCK_SIZE - 1
+            Case ConfigChunk * BLOCK_SIZE To TestChunk * BLOCK_SIZE - 1
                 Return BLOCKTYPE.CONFIG
-            Case TestChunk * BLOCK_SIZE To (TestChunk + 1) * BLOCK_SIZE - 1
+            Case TestChunk * BLOCK_SIZE To CutChunk * BLOCK_SIZE - 1
                 Return BLOCKTYPE.TEST
-            Case CutChunk * BLOCK_SIZE To (CutChunk + 1) * BLOCK_SIZE - 1
+            Case CutChunk * BLOCK_SIZE To DrawChunks(0) * BLOCK_SIZE - 1
                 Return BLOCKTYPE.CUT
             Case DrawChunks(0) * BLOCK_SIZE To FileSize
                 Return BLOCKTYPE.DRAW
@@ -1004,6 +1006,8 @@ Public Class Form1
         ConfigChunk = GetInt(&H70)
         TestChunk = GetInt()
         CutChunk = GetInt()
+        DrawChunks.Clear()
+        DrawChunks.Add(5)       ' the first draw sub will be 5
         reader.Close()
 
         MakeTestBlock(writer, dxf, Outline, TestLayer)
@@ -1035,8 +1039,7 @@ Public Class Form1
             WriteMOL(MOL_START, {772, StartPosns(i).position.X, StartPosns(i).position.Y})
             WriteMOL(MOL_GOSUBn, {3, i, 0, 0})
         Next
-        ' add unknown command
-        WriteMOL(&H1000846, {0})
+        WriteMOL(MOL_LASER3, {OnOff_Enum.Off})
         ' add GOSUBn 603
         WriteMOL(MOL_GOSUBn, {3, 603, 0, 0})
         ' end the config block
@@ -1079,8 +1082,7 @@ Public Class Form1
         ' Create engraving as SUBR 3. Subroutine engraves a single cell
         Const BlockNumber = 5       ' block number of first subroutine
         Dim StartofBlock = BlockNumber * BLOCK_SIZE   ' address of start of next block. First subr at A00
-        PutInt(BlockNumber, &H7C) : DrawChunks.Add(BlockNumber)
-        writer.BaseStream.Position = StartofBlock       ' position at start of block
+        PutInt(BlockNumber, &H7C) '  DrawChunks.Add(BlockNumber)    ' was added earlier
         WriteMOL(MOL_BEGSUBa, {3}, StartofBlock)    ' begin SUB 
         WriteMOL(&H1000D46, {&HBB8})         ' unknown command
 
@@ -1454,7 +1456,7 @@ Public Class Form1
             ' Move to start of engraving
             DXF_line(position, position + delta, MoveLayer)     ' move to start
             MoveRelativeSplit(delta, speed)
-            WriteMOL(MOL_LASER1, {2})     ' turn laser on engrave mode?
+            WriteMOL(MOL_LASER1, {OnOff_Enum.Engrave})     ' turn laser on engrave mode?
             Dim Steps As OnOffSteps                 ' construct steps as on for cellwidth, and off for 0
             Steps.OnSteps = outline.Width * xScale
             Steps.OffSteps = 0
@@ -2323,25 +2325,25 @@ Public Class Form1
             ' Populate the rows
             worksheet.Rows(row).Cells("A").Value = $"0x{c.Key:x8}"
             worksheet.Rows(row).Cells("B").Value = c.Value.Mnemonic
-                worksheet.Rows(row).Cells("C").Value = c.Value.Description
-                Dim pNum = 1
-                For Each p In c.Value.Parameters
-                    worksheet.Rows(row).Cells("D").Value = $"p{pNum}"
-                    worksheet.Rows(row).Cells("E").Value = p.Description
-                    worksheet.Rows(row).Cells("F").Value = p.Name
+            worksheet.Rows(row).Cells("C").Value = c.Value.Description
+            Dim pNum = 1
+            For Each p In c.Value.Parameters
+                worksheet.Rows(row).Cells("D").Value = $"p{pNum}"
+                worksheet.Rows(row).Cells("E").Value = p.Description
+                worksheet.Rows(row).Cells("F").Value = p.Name
                 Dim typ = p.Typ.ToString
                 If typ.StartsWith("MOL.") Then typ = typ.Substring(4)    ' remove MOL qualifier
                 Select Case typ
-                        Case "System.Int32" : typ = "Int32"
+                    Case "System.Int32" : typ = "Int32"
                     Case "System.Collections.Generic.List`1[MOL.OnOffSteps]" : typ = "List(Of OnOffSteps)"
-                    End Select
-                    worksheet.Rows(row).Cells("G").Value = typ
-                    worksheet.Rows(row).Cells("H").Value = p.Scale
-                    worksheet.Rows(row).Cells("I").Value = p.Units
+                End Select
+                worksheet.Rows(row).Cells("G").Value = typ
+                worksheet.Rows(row).Cells("H").Value = p.Scale
+                worksheet.Rows(row).Cells("I").Value = p.Units
 
-                    pNum += 1
-                    row += 1
-                Next
+                pNum += 1
+                row += 1
+            Next
 
             ' if more than 1 parameter, then merge cols A,B,C for this command
             Dim pars = c.Value.Parameters.Count

@@ -109,7 +109,7 @@ Friend Module Utilities
         Dim StartAngleRad = DegToRad(arc.Item3)
         Dim EndAngleRad = DegToRad(arc.Item4)
         ' Ensure the angles are in the correct order
-        If EndAngleRad <StartAngleRad Then
+        If EndAngleRad < StartAngleRad Then
             EndAngleRad += 2 * Math.PI
         End If
         Dim angleIncrement = (EndAngleRad - StartAngleRad) / (numpoints - 1)
@@ -120,5 +120,12 @@ Friend Module Utilities
             result.Vertexes.Add(New Polyline2DVertex(x, y))
         Next
         Return result
+    End Function
+    ' Generic function to check if a variable has a value from any enum
+    Public Function IsValidEnumValue(Of T As Structure)(value As Integer) As Boolean
+        If Not GetType(T).IsEnum Then
+            Throw New ArgumentException("T must be an enumerated type")
+        End If
+        Return [Enum].IsDefined(GetType(T), value)
     End Function
 End Module
