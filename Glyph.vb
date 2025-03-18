@@ -21,10 +21,7 @@ Public Class Glyph
     End Sub
 
     Public Sub New(strokes As List(Of Polyline2D))
-        If strokes Is Nothing Then
-            Throw New ArgumentNullException(NameOf(strokes))
-        End If
-
+        ArgumentNullException.ThrowIfNull(strokes)
         Me.Strokes = strokes
     End Sub
 End Class

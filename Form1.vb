@@ -69,10 +69,13 @@ Public Enum ParameterCount
     VARIABLE    ' the number of parameters for this command is variable
 End Enum
 ' Define some custom types
-Friend Enum OnOff_Enum
+Friend Enum LSRMode_Enum    ' Laser cut mode
     Off = 0
-    [On] = 1
-    Engrave = 2
+    Cut = 1             ' Cut through
+    Engrave = 2         ' Normal engraving
+    GradeEngrave = 3    ' bevel the corners of your engraving
+    Hole = 4            ' perforations
+    PenCut = 5          ' Rumoured to crash LaserCut
 End Enum
 
 Friend Enum Axis_Enum
@@ -111,6 +114,7 @@ Public Class Form1
     Private ColorIndex As Integer = 1       ' index into colors array
     Private CommandUsage As New Dictionary(Of Integer, Integer)(50)
     Private dxf As New DxfDocument()
+    Private dxfBlock As netDxf.Blocks.Block     ' current block we are writing to
     Private StepsArray() As OnOffSteps              ' parameter to ENGLSR command
     Private Stack As New Stack()                    ' used by GOSUB to hold return address
     Private motion As New Polyline2D                ' list of all laser moves
@@ -131,9 +135,9 @@ Public Class Form1
     Private SpaceAcc As Double = 1200       ' Acceleration whilst just moving
     Private ClipBoxPower As Integer = 40    ' power setting for Cut box
     Private ClipBoxSpeed As Integer = 25    ' speed setting for Cut box
+    Private LaserMode As LSRMode_Enum = LSRMode_Enum.Off  ' current laser beam mode
 
     Private position As IntPoint    ' current laser head position in mm
-    Private LaserIsOn As Boolean = False        ' tracks state of laser
     Public xScale As Double = 125.9842519685039    ' X axis steps/mm.   From the Worktable config dialog [Pulse Unit] parameter
     Public yScale As Double = 125.9842519685039    ' Y axis steps/mm
     Public zScale As Double = 125.9842519685039    ' Z axis steps/mm
@@ -152,6 +156,8 @@ Public Class Form1
     Private EngSpeed As Double              ' Engrave speed (mm/s)
     Private MVRELInConfig As Integer      ' number of MVREL encountered so far in CONFIG section
     Private MCBLKCounter As Integer = 0     ' counter when inside MCBLK
+
+    Private MaxLength As Double = 0
 
     ' Define some layers for DXF file
     Private TextLayer As New Layer("Text") With {       ' text
@@ -254,13 +260,14 @@ Public Class Form1
     Private Const MOL_GOSUB = &H1500048
     Private Const MOL_GOSUBb = &H80500008
     Private Const MOL_GOSUB3 = &H3500048
+    Private Const MOL_GOSUBn = &H80500048
     Private Const MOL_X5_FIRST = &H200548
     Private Const MOL_X6_LAST = &H200648
     Private Const MOL_ACCELERATION = &H1004601
     Private Const MOL_BLWR = &H1004A41
     Private Const MOL_BLWRa = &H1004B41
     Private Const MOL_SEGMENT = &H500008
-    Private Const MOL_GOSUBn = &H80500048
+
     Private Const MOL_ENGPWR = &H1000746
     Private Const MOL_ENGPWR1 = &H2000746
     Private Const MOL_ENGSPD = &H2014341
@@ -348,22 +355,28 @@ Public Class Form1
                             {New Parameter("Unknown", "", GetType(Float))}
                             }
                          )},
-        {MOL_LASER, New LASERcmd("LASER", "Laser on or off control", ParameterCount.FIXED, New List(Of Parameter) From {
-                {New Parameter("On/Off", "On or Off", GetType(OnOff_Enum))}})},
-        {MOL_LASER1, New LASERcmd("LASER1", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
-        {MOL_LASER2, New LASERcmd("LASER2", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
-        {MOL_LASER3, New LASERcmd("LASER3", "", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
+        {MOL_LASER, New LASERcmd("LASER", "Laser mode control", ParameterCount.FIXED, New List(Of Parameter) From {
+                {New Parameter("Mode", "LASER mode", GetType(LSRMode_Enum))}})},
+        {MOL_LASER1, New LASERcmd("LASER1", "LASER mode", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Mode", "", GetType(LSRMode_Enum))}})},
+        {MOL_LASER2, New LASERcmd("LASER2", "LASER mode", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Mode", "", GetType(LSRMode_Enum))}})},
+        {MOL_LASER3, New LASERcmd("LASER3", "LASER mode", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Mode", "", GetType(LSRMode_Enum))}})},
         {MOL_GOSUB, New LASERcmd("GOSUB", "Call a subroutine with no parameters", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "Number of the subroutine", GetType(Int32))}
                             }
                            )},
         {MOL_GOSUBb, New LASERcmd("GOSUBb", "Call subroutine with 3 parameters", ParameterCount.VARIABLE, New List(Of Parameter) From {
                         {New Parameter("n", "Subroutine number", GetType(Int32))},
-                        {New Parameter("x", "x value", GetType(Float))},
-                        {New Parameter("y", "y value", GetType(Float))}}
+                        {New Parameter("x", "x parameter", GetType(Float))},
+                        {New Parameter("y", "y parameter", GetType(Float))}}
                         )},
         {MOL_GOSUB3, New LASERcmd("GOSUB3", "Call subroutine with 3 parameters", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("n", "Number of the subroutine", GetType(Int32))},
+                            {New Parameter("n", "Subroutine number", GetType(Int32))},
+                            {New Parameter("x", "x parameter", GetType(Float))},
+                            {New Parameter("y", "y parameter", GetType(Float))}
+                            }
+                           )},
+         {MOL_GOSUBn, New LASERcmd("GOSUBn", "", ParameterCount.VARIABLE, New List(Of Parameter) From {
+                            {New Parameter("n", "Subroutine number", GetType(Int32))},
                             {New Parameter("x", "x parameter", GetType(Float))},
                             {New Parameter("y", "y parameter", GetType(Float))}
                             }
@@ -374,15 +387,9 @@ Public Class Form1
                             {New Parameter("n", "", GetType(Int32))}
                             }
                            )},
-        {MOL_GOSUBn, New LASERcmd("GOSUBn", "", ParameterCount.VARIABLE, New List(Of Parameter) From {
-                            {New Parameter("n", "", GetType(Int32))},
-                            {New Parameter("x", "", GetType(Float))},
-                            {New Parameter("y", "", GetType(Float))}
-                            }
-                           )},
         {MOL_ACCELERATION, New LASERcmd("ACCELERATION", "Accelerate or Decelerate", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Acceleration", "", GetType(Acceleration_Enum))}})},
-        {MOL_BLWR, New LASERcmd("BLWR", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
-        {MOL_BLWRa, New LASERcmd("BLWRa", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
+        {MOL_BLWR, New LASERcmd("BLWR", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(LSRMode_Enum))}})},
+        {MOL_BLWRa, New LASERcmd("BLWRa", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(LSRMode_Enum))}})},
         {MOL_ENGPWR, New LASERcmd("ENGPWR", "Engrave Power", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Engrave power", "", GetType(Integer), 0.01, "%")}})},
         {MOL_ENGPWR1, New LASERcmd("ENGPWR1", "", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("Power", "", GetType(Integer), 0.01, "%")},
@@ -577,7 +584,7 @@ Public Class Form1
                             Else
                                 writer.Write($"{val * p.Scale:f2} {p.Units}")
                             End If
-                        Case GetType(OnOff_Enum) : Dim par = GetInt() : If par Mod 2 = 0 Then writer.Write($"Off({par:x})") Else writer.Write($"On({par:x})")
+                        Case GetType(LSRMode_Enum) : Dim par = GetInt() : If par Mod 2 = 0 Then writer.Write($"Off({par:x})") Else writer.Write($"On({par:x})")
                         Case GetType(Acceleration_Enum) : writer.Write($"{CType(GetInt(), Acceleration_Enum)}")
                         Case GetType(Axis_Enum) : writer.Write($"{CType(GetInt(), Axis_Enum)}")
                         Case GetType(List(Of OnOffSteps))    ' a list of On/Off steps
@@ -619,7 +626,7 @@ Public Class Form1
         ' Translate start address to subroutine
         ' Look in start address
 
-        LaserIsOn = False
+        LaserMode = LSRMode_Enum.Off
         Dim addr = StartAddress
         Do
             'AddrTrace.Add(addr)
@@ -660,10 +667,14 @@ Public Class Form1
                 End If
                 i = GetUInt()
                 Select Case i
-                    Case 0 : LaserIsOn = False
-                    Case 1, 2, 3 : LaserIsOn = True
+                    Case 0 : LaserMode = LSRMode_Enum.Off
+                    Case 1 : LaserMode = LSRMode_Enum.Cut
+                    Case 2 : LaserMode = LSRMode_Enum.Engrave
+                    Case 3 : LaserMode = LSRMode_Enum.GradeEngrave
+                    Case 4 : LaserMode = LSRMode_Enum.Hole
+                    Case 5 : LaserMode = LSRMode_Enum.PenCut
                     Case Else
-                        If debugflag Then TextBox1.AppendText($"Unknown LaserIsOn parameter &h{i:x8}")
+                        Throw New Exception($"Unknown laser mode {i} @0x{addr:x}")
                 End Select
 
             Case MOL_SCALE      ' also MOL_SPDPWR, MOL_SPDPWRx
@@ -671,7 +682,9 @@ Public Class Form1
 
             Case MOL_MVREL, MOL_START
                 Dim n = GetUInt()           ' always 772
+                If n <> 772 Then Throw New Exception($"MOL_MVREL: n is not 772 @0x{addr:x}")
                 Dim delta = New IntPoint(GetInt(), GetInt())      ' move relative command
+                If delta = ZERO Then Throw New Exception($"MOL_MVREL: delta is (0,0) @0x{addr:x}")
 
                 Select Case block
                     Case BLOCKTYPE.CONFIG
@@ -688,7 +701,7 @@ Public Class Form1
                         DXF_line(position, position + delta, Layer)     ' render on this layer ignoring laser commands
 
                     Case BLOCKTYPE.DRAW
-                        If LaserIsOn Then
+                        If LaserMode <> LSRMode_Enum.Off Then
                             Dim colour As AciColor
                             Select Case CurrentSubr
                                 Case 3 : colour = PowerSpeedColor(EngPower, EngSpeed)
@@ -703,6 +716,7 @@ Public Class Form1
                     Case Else
                         Throw New System.Exception($"Unexpected block type: {block}")
                 End Select
+                If LaserMode <> LSRMode_Enum.Off Then MaxLength = Math.Max(delta.Length, MaxLength)
                 If block <> BLOCKTYPE.CONFIG Then position += delta       ' update head position
 
             Case MOL_ENGACD
@@ -767,6 +781,7 @@ Public Class Form1
 
             Case MOL_BEGSUB, MOL_BEGSUBa  ' begin subroutine
                 Dim n = GetUInt()
+                dxfBlock = New Blocks.Block($"Subr {n}")        ' create the block for this subroutine
                 CurrentSubr = n
                 If n < 100 Then
                     If StartPosns.ContainsKey(n) Then
@@ -801,6 +816,10 @@ Public Class Form1
 
             Case MOL_ENDSUB  ' end subroutine
                 Dim n = GetUInt()
+                dxf.Blocks.Add(dxfBlock)        ' add the block to the dxf file
+                Dim insert As New Insert(dxfBlock)      ' create an insert
+                dxf.Entities.Add(insert)                ' add the insert to Entities
+                dxfBlock = Nothing                      ' deallocate block
                 ' Output any buffered polyline
                 If motion.Vertexes.Count > 0 Then
                     ' add the motion to the dxf file    
@@ -817,7 +836,7 @@ Public Class Form1
                     Throw New System.Exception($"Stack is exhausted - no return address for ENDSUB {n}")
                 End If
 
-            Case MOL_GOSUBn       ' Call subroutine with parameters
+            Case MOL_GOSUBn, MOL_GOSUBb       ' Call subroutine with parameters
                 Dim n = GetInt()     ' get subroutine number
                 Dim posn = New IntPoint(GetFloat(), GetFloat())     ' subroutine parameter ignored
                 If n < 100 Then
@@ -829,14 +848,13 @@ Public Class Form1
 
             Case MOL_GOSUB ' GOSUB
                 Dim n As Integer = GetInt()
-                Select Case nWords
-                    Case 1
-                    Case 3
-                        Dim x = GetInt()
-                        Dim y = GetInt()
-                End Select
+                dxfBlock = New Blocks.Block($"Subr {n}")
+
+            Case MOL_ACCELERATION, MOL_SETSPD, MOL_PWRSPD5, MOL_PWRSPD7, MOL_BLWRa, MOL_LASER2, MOL_LASER3, MOL_X5_FIRST, MOL_MOTION, MOL_ENGSPD1, MOL_ENGPWR1
+                ' Nothing to do
 
             Case Else
+                If Commands.ContainsKey(cmd) Then Throw New Exception($"Unhandled command {Commands(cmd).Mnemonic} @0x{addr:x}") ' Check for un-handled command
                 ' consume all parameters
                 For i = 1 To nWords
                     GetInt()    ' consume parameters
@@ -877,7 +895,7 @@ Public Class Form1
         If color IsNot Nothing Then
             line.Color = color
         End If
-        dxf.Entities.Add(line)
+        dxfBlock.Entities.Add(line)
     End Sub
 
     Public Sub DXF_polyline2d(Polyline As Polyline2D, Layer As Layer, Optional ByVal scale As Double = 1.0)
@@ -888,7 +906,7 @@ Public Class Form1
             Dim transform As New Matrix3(scale, 0, 0, 0, scale, 0, 0, 0, scale)
             ply.TransformBy(transform, New Vector3(0, 0, 0))
         End If
-        dxf.Entities.Add(ply)
+        dxfBlock.Entities.Add(ply)
     End Sub
 
     Public Sub HexDumpBlock(addr As Integer)
@@ -1039,7 +1057,7 @@ Public Class Form1
             WriteMOL(MOL_START, {772, StartPosns(i).position.X, StartPosns(i).position.Y})
             WriteMOL(MOL_GOSUBn, {3, i, 0, 0})
         Next
-        WriteMOL(MOL_LASER3, {OnOff_Enum.Off})
+        WriteMOL(MOL_LASER3, {LSRMode_Enum.Off})
         ' add GOSUBn 603
         WriteMOL(MOL_GOSUBn, {3, 603, 0, 0})
         ' end the config block
@@ -1098,7 +1116,7 @@ Public Class Form1
                 Dim cell = New Rect(New System.Windows.Point(outline.Left + power * cellsize.Width, outline.Top + speed * cellsize.Height), cellsize)  ' one 10x10 cell
                 cell = Rect.Inflate(cell, -0.75, -0.75)       ' shrink it a bit to create a margin
                 DrawBox(writer, dxf, cell, layer, My.Settings.Engrave, powers(power), speeds(speed))
-                WriteMOL(MOL_LASER, {OnOff_Enum.Off})    ' turn laser off
+                WriteMOL(MOL_LASER, {LSRMode_Enum.Off})    ' turn laser off
             Next
         Next
         WriteMOL(&H1000B46, {&H200})         ' unknown command
@@ -1179,7 +1197,7 @@ Public Class Form1
                         For Each s In p
                             PutInt(s.steps)
                         Next
-                    Case GetType(Acceleration_Enum), GetType(OnOff_Enum), GetType(Axis_Enum)
+                    Case GetType(Acceleration_Enum), GetType(LSRMode_Enum), GetType(Axis_Enum)
                         PutInt(p)
                     Case Else
                         Throw New System.Exception($"WRITEMOL Parameter of unsupported type {p.GetType}")
@@ -1324,13 +1342,13 @@ Public Class Form1
 
         ' Work out whether we can do a 2 part move, or it's too long and we need 3
         If delta = ZERO Then Return     ' we're already there
-        Dim Accel = IIf(LaserIsOn, WorkAcc, SpaceAcc)   ' Acceration difers if laser is on or not
+        Dim Accel = IIf(LaserMode = LSRMode_Enum.Off, SpaceAcc, WorkAcc)   ' Acceleration differs if laser is on or not
         Dim T = (speed - StartSpeed) / Accel       ' T =(max speed-initial speed)/acceleration time taken to reach QuickSpeed
         Dim S As Integer = CInt(StartSpeed * T + xScale * 0.5 * Accel * T ^ 2)  ' s=ut+0.5t*t  distance (steps) travelled whilst reaching this speed
         ' Calculate 2 or 3 part move
         Dim Dist = delta.Length         ' distance to move
 
-        If S > Dist / 2 Or Not LaserIsOn Then
+        If S > Dist / 2 Or (LaserMode = LSRMode_Enum.Off) Then
             ' we can get more than halfway if we needed, so 2 pieces enough
             ' We do it this way to avoid rounding errors
             Dim delta1 = New IntPoint(delta.X / 2, delta.Y / 2)
@@ -1402,7 +1420,7 @@ Public Class Form1
             WriteMOL(&H1000B06, {&H201})        ' Unknown magic command
             ' Ordinary box with 4 sides
             Dim block = GetBlockType(writer.BaseStream.Position)    ' get block type   
-            If block = BLOCKTYPE.DRAW Or block = BLOCKTYPE.CUT Then WriteMOL(MOL_LASER, {OnOff_Enum.[On]}) : LaserIsOn = True
+            If block = BLOCKTYPE.DRAW Or block = BLOCKTYPE.CUT Then LaserMode = LSRMode_Enum.Cut : WriteMOL(MOL_LASER, {LaserMode}) : 
             If block = BLOCKTYPE.DRAW Then
                 ' We are cutting, so use precise cut line
                 CutLinePrecise(New IntPoint(-outline.Width * xScale, 0), speed, WorkAcc)
@@ -1416,7 +1434,7 @@ Public Class Form1
                 MoveRelativeSplit(New System.Windows.Point(outline.Width, 0), speed)
                 MoveRelativeSplit(New System.Windows.Point(0, outline.Height), speed)
             End If
-            If LaserIsOn Then WriteMOL(MOL_LASER, {OnOff_Enum.Off}) : LaserIsOn = False     ' Turn laser off
+            If LaserMode <> LSRMode_Enum.Off Then LaserMode = LSRMode_Enum.Off : WriteMOL(MOL_LASER, {LaserMode})     ' Turn laser off
             FlushMCBLK(False)       ' close MCB
             WriteMOL(&H1000B06, {&H200})        ' Unknown magic command
             WriteMOL(&H1000B06, {&H200})        ' Unknown magic command
@@ -1456,7 +1474,7 @@ Public Class Form1
             ' Move to start of engraving
             DXF_line(position, position + delta, MoveLayer)     ' move to start
             MoveRelativeSplit(delta, speed)
-            WriteMOL(MOL_LASER1, {OnOff_Enum.Engrave})     ' turn laser on engrave mode?
+            WriteMOL(MOL_LASER1, {LSRMode_Enum.Engrave})     ' turn laser on engrave mode?
             Dim Steps As OnOffSteps                 ' construct steps as on for cellwidth, and off for 0
             Steps.OnSteps = outline.Width * xScale
             Steps.OffSteps = 0
@@ -1541,14 +1559,14 @@ Public Class Form1
                 DXF_line(position, position + delta, MoveLayer)
                 MoveRelativeSplit(delta, TextSpeed)      ' move in 2 segments
             End If
-            WriteMOL(MOL_LASER, {OnOff_Enum.[On]})
+            WriteMOL(MOL_LASER, {LSRMode_Enum.Cut})
             ' Process all vertexes, except the first
             For p = 1 To stroke.Vertexes.Count - 1
                 Dim thispoint = New IntPoint(stroke.Vertexes(p).Position.X, stroke.Vertexes(p).Position.Y)
                 delta = thispoint - position
                 MoveRelativeSplit(delta, TextSpeed)          ' draw stroke
             Next
-            WriteMOL(MOL_LASER, {OnOff_Enum.Off})
+            WriteMOL(MOL_LASER, {LSRMode_Enum.Off})
         Next
         FlushMCBLK(False)
     End Sub
@@ -1913,6 +1931,7 @@ Public Class Form1
             For Each sp In StartPosns
                 TextBox1.AppendText($" {sp.Key} : Absolute {sp.Value.Absolute}, x={sp.Value.position.X}, y={sp.Value.position.Y}{vbCrLf}")
             Next
+            TextBox1.AppendText($"maximum vector drawn = {MaxLength / xScale}mm{vbCrLf}")
             ' Open dxf file
             Dim myProcess As New Process
             With myProcess
@@ -1949,7 +1968,7 @@ Public Class Form1
         ChunksWithCode.Clear()
         FontData.Clear()
         position = ZERO
-        LaserIsOn = False
+        LaserMode = LSRMode_Enum.Off
         AccelLength = 0
         CurrentSubr = 0
         StartPosns.Clear()
@@ -1987,7 +2006,7 @@ Public Class Form1
     Private Sub LineTestToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles LineTestToolStripMenuItem.Click
         ' draw a 10mm horizontal line
         dxf = New DxfDocument
-        'dxf.Entities.Add(New Line(New Vector2(0, 0), New Vector2(0, 10)))
+        'dxfblock.entities.add(New Line(New Vector2(0, 0), New Vector2(0, 10)))
         DXF_line(New System.Windows.Point(0, 0), New System.Windows.Point(0, 10), MoveLayer)
         dxf.Save("LineTest.dxf")
     End Sub
@@ -2014,16 +2033,16 @@ Public Class Form1
         ply = DisplayString(st, System.Windows.TextAlignment.Left, New System.Windows.Point(10, 10), 9, 0)
 
         For Each pl In ply
-            dxf.Entities.Add(pl)
+            dxfBlock.Entities.Add(pl)
         Next
 
         ' Draw a crosshair
         Dim Cross As New System.Windows.Point(300, 300)
         Dim w As New System.Windows.Size(10, 10)
         Dim ln As New Line(New Vector2(Cross.X - w.Width, Cross.Y), New Vector2(Cross.X + w.Width, Cross.Y)) With {.Color = AciColor.Red}
-        dxf.Entities.Add(ln)
+        dxfBlock.Entities.Add(ln)
         ln = New Line(New Vector2(Cross.X, Cross.Y - w.Height), New Vector2(Cross.X, Cross.Y + w.Height)) With {.Color = AciColor.Red}
-        dxf.Entities.Add(ln)
+        dxfBlock.Entities.Add(ln)
         ' 5,2.5;0,2.5,A-1;0,6.5;5,6.5,A-1;5,2.5 = "O"
         ' 1,10;1,-1,A0.181818   = "("
 
@@ -2034,44 +2053,44 @@ Public Class Form1
         st = "String at 0 center"
         ply = DisplayString(st, System.Windows.TextAlignment.Center, Cross, 10, 0)
         For Each pl In ply
-            dxf.Entities.Add(pl)
+            dxfBlock.Entities.Add(pl)
         Next
         st = "String at 90 left"
         ply = DisplayString(st, System.Windows.TextAlignment.Left, Cross, 10, 90)
         For Each pl In ply
-            dxf.Entities.Add(pl)
+            dxfBlock.Entities.Add(pl)
         Next
         st = "String at 45 right"
         ply = DisplayString(st, System.Windows.TextAlignment.Right, Cross, 10, 45)
         For Each pl In ply
-            dxf.Entities.Add(pl)
+            dxfBlock.Entities.Add(pl)
         Next
 
         st = "Power (%) - 10mm"
         ply = DisplayString(st, System.Windows.TextAlignment.Left, New System.Windows.Point(50, 50), 10, 45)
         For Each pl In ply
-            dxf.Entities.Add(pl)
+            dxfBlock.Entities.Add(pl)
         Next
 
         st = "This is left justified - 5mm"
         ply = DisplayString(st, System.Windows.TextAlignment.Left, New System.Windows.Point(200, 60), 5, 0)
         For Each pl In ply
-            dxf.Entities.Add(pl)
+            dxfBlock.Entities.Add(pl)
         Next
         st = "This is center justified - 5mm"
         ply = DisplayString(st, System.Windows.TextAlignment.Center, New System.Windows.Point(200, 70), 5, 0)
         For Each pl In ply
-            dxf.Entities.Add(pl)
+            dxfBlock.Entities.Add(pl)
         Next
         st = "This is right justified - 5mm"
         ply = DisplayString(st, System.Windows.TextAlignment.Right, New System.Windows.Point(200, 80), 5, 0)
         For Each pl In ply
-            dxf.Entities.Add(pl)
+            dxfBlock.Entities.Add(pl)
         Next
         st = "This is center justified - 20mm"
         ply = DisplayString(st, System.Windows.TextAlignment.Center, New System.Windows.Point(200, 90), 20, 0)
         For Each pl In ply
-            dxf.Entities.Add(pl)
+            dxfBlock.Entities.Add(pl)
         Next
 
         dxf.Save("GlyphTest.dxf")
