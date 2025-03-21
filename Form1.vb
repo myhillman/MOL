@@ -15,42 +15,77 @@ Imports GemBox.Spreadsheet
 
 ' Create a pseudo type to handle Leetro floating point numbers in a more natural way
 ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
+''' <summary>
+''' Represents a Leetro floating-point number and provides methods for encoding and decoding.
+''' </summary>
 Public Structure Float
+    ''' <summary>
+    ''' The Leetro floating-point value represented as an integer.
+    ''' </summary>
     Public ReadOnly value As Integer
-    ' Constructor to initialize from a double
+
+    ''' <summary>
+    ''' Initializes a new instance of the <see cref="Float"/> structure from a double value.
+    ''' </summary>
+    ''' <param name="d">The double value to encode as a Leetro floating-point number.</param>
     Public Sub New(d As Double)
         value = Double2Float(d)
     End Sub
 
-    ' Constructor to initialize from an integer
+    ''' <summary>
+    ''' Initializes a new instance of the <see cref="Float"/> structure from an integer value.
+    ''' </summary>
+    ''' <param name="leetro">The integer value representing a Leetro floating-point number.</param>
     Public Sub New(leetro As Integer)
         value = leetro
     End Sub
-    ' Property to get the double value
+
+    ''' <summary>
+    ''' Gets the double value equivalent of the Leetro floating-point number.
+    ''' </summary>
+    ''' <returns>The double value equivalent of the Leetro floating-point number.</returns>
     Public ReadOnly Property AsDouble() As Double
         Get
             Return Float2Double(value)
         End Get
     End Property
 
-    ' Method to encode a double to Leetro format
+    ''' <summary>
+    ''' Encodes a double value as a Leetro floating-point number.
+    ''' </summary>
+    ''' <param name="d">The double value to encode.</param>
+    ''' <returns>A <see cref="Float"/> structure representing the encoded value.</returns>
     Public Shared Function Encode(d As Double) As Float
         Return New Float(d)
     End Function
+
+    ''' <summary>
+    ''' Encodes an integer value as a Leetro floating-point number.
+    ''' </summary>
+    ''' <param name="i">The integer value to encode.</param>
+    ''' <returns>A <see cref="Float"/> structure representing the encoded value.</returns>
     Public Shared Function Encode(i As Integer) As Float
         Return New Float(CDbl(i))
     End Function
 
-    ' Method to decode a Leetro format to double
+    ''' <summary>
+    ''' Decodes a Leetro floating-point number to a double value.
+    ''' </summary>
+    ''' <param name="l">The <see cref="Float"/> structure to decode.</param>
+    ''' <returns>The double value equivalent of the Leetro floating-point number.</returns>
     Public Shared Function Decode(l As Float) As Double
         Return l.AsDouble
     End Function
 
-    ' Override ToString method for easy display
+    ''' <summary>
+    ''' Returns a string that represents the current object.
+    ''' </summary>
+    ''' <returns>A string that represents the current object.</returns>
     Public Overrides Function ToString() As String
         Return AsDouble().ToString()
     End Function
 End Structure
+
 
 ' Define the different block types
 Public Enum BLOCKTYPE
@@ -88,14 +123,35 @@ Friend Enum Acceleration_Enum
     Decelerate = 2
 End Enum
 
-' A structure to hold 2 x 16 bit values. All 32 bits can be written through the Steps property. Individual 16 bit values can be read via OnSteps and OffSteps property
+Friend Enum OnOff_Enum
+    Off = 0
+    [On] = 1
+End Enum
+
+''' <summary>
+''' A structure to hold two 16-bit values representing the number of steps the laser is on and off.
+''' </summary>
+''' <remarks>
+''' The structure allows access to the combined 32-bit value as well as the individual 16-bit values.
+''' </remarks>
 <StructLayout(LayoutKind.Explicit)> Public Structure OnOffSteps
+    ''' <summary>
+    ''' The combined 32-bit value representing both on and off steps.
+    ''' </summary>
     <FieldOffset(0)>
     Public Steps As Integer
+
+    ''' <summary>
+    ''' The number of steps the laser is on.
+    ''' </summary>
     <FieldOffset(0)>
-    Public OnSteps As UShort        ' number of steps laser on
+    Public OnSteps As UShort
+
+    ''' <summary>
+    ''' The number of steps the laser is off.
+    ''' </summary>
     <FieldOffset(2)>
-    Public OffSteps As UShort        ' number of steps laser off
+    Public OffSteps As UShort
 End Structure
 
 Public Class Form1
@@ -129,6 +185,7 @@ Public Class Form1
 
     ' Variables that reflect the state of the laser cutter
     ' These parameters from Machine Options - Worktable dialog
+    Private PWMFrequency As Integer = 20000  ' PWM frequency
     Private StartSpeed As Double = 5        ' Initial speed when moving
     Private QuickSpeed As Double = 300      ' Max speed when moving
     Private WorkAcc As Double = 500         ' Acceleration whilst cutting
@@ -136,6 +193,7 @@ Public Class Form1
     Private ClipBoxPower As Integer = 40    ' power setting for Cut box
     Private ClipBoxSpeed As Integer = 25    ' speed setting for Cut box
     Private LaserMode As LSRMode_Enum = LSRMode_Enum.Off  ' current laser beam mode
+    Private block As BLOCKTYPE              ' current block type
 
     Private position As IntPoint    ' current laser head position in mm
     Public xScale As Double = 125.9842519685039    ' X axis steps/mm.   From the Worktable config dialog [Pulse Unit] parameter
@@ -201,13 +259,44 @@ Public Class Form1
         }
 
     Public Class Parameter
-        ' a class for a parameter
-        Public Property Name As String     ' the name of the parameter
-        Public Property Description As String
-        Public Property Typ As Type       ' the type of the parameter
-        Public Property Scale As Double    ' scale applied to value
-        Public Property Units As String    ' the units of the value, e.g. mm
+        ''' <summary>
+        ''' Gets or sets the name of the parameter.
+        ''' </summary>
+        ''' <value>The name of the parameter.</value>
+        Public Property Name As String
 
+        ''' <summary>
+        ''' Gets or sets the description of the parameter.
+        ''' </summary>
+        ''' <value>The description of the parameter.</value>
+        Public Property Description As String
+
+        ''' <summary>
+        ''' Gets or sets the type of the parameter.
+        ''' </summary>
+        ''' <value>The type of the parameter.</value>
+        Public Property Typ As Type
+
+        ''' <summary>
+        ''' Gets or sets the scale applied to the parameter value.
+        ''' </summary>
+        ''' <value>The scale applied to the parameter value.</value>
+        Public Property Scale As Double
+
+        ''' <summary>
+        ''' Gets or sets the units of the parameter value, e.g., mm.
+        ''' </summary>
+        ''' <value>The units of the parameter value.</value>
+        Public Property Units As String
+
+        ''' <summary>
+        ''' Initializes a new instance of the <see cref="Parameter"/> class with the specified name, description, type, scale, and units.
+        ''' </summary>
+        ''' <param name="name">The name of the parameter.</param>
+        ''' <param name="description">The description of the parameter.</param>
+        ''' <param name="type">The type of the parameter.</param>
+        ''' <param name="scale">The scale applied to the parameter value. Default is 1.</param>
+        ''' <param name="units">The units of the parameter value. Default is an empty string.</param>
         Public Sub New(name As String, description As String, type As Type, Optional ByVal scale As Double = 1, Optional ByVal units As String = "")
             Me.Name = name
             Me.Description = description
@@ -215,28 +304,64 @@ Public Class Form1
             Me.Scale = scale
             Me.Units = units
         End Sub
-
     End Class
 
-    Public Class LASERcmd
+    Public Class MOLcmd
+        ''' <summary>
+        ''' Gets or sets the mnemonic of the command.
+        ''' </summary>
+        ''' <value>The mnemonic of the command.</value>
         Public Property Mnemonic As String
-        Public Property Description As String
-        Public Property ParameterType As ParameterCount = ParameterCount.FIXED       ' VARIABLE OR FIXED
-        Public Property Parameters As New List(Of Parameter)    ' the type of the parameter
 
+        ''' <summary>
+        ''' Gets or sets the description of the command.
+        ''' </summary>
+        ''' <value>The description of the command.</value>
+        Public Property Description As String
+
+        ''' <summary>
+        ''' Gets or sets the parameter count type of the command (FIXED or VARIABLE).
+        ''' </summary>
+        ''' <value>The parameter count type of the command.</value>
+        Public Property ParameterType As ParameterCount = ParameterCount.FIXED
+
+        ''' <summary>
+        ''' Gets or sets the list of parameters for the command.
+        ''' </summary>
+        ''' <value>The list of parameters for the command.</value>
+        Public Property Parameters As New List(Of Parameter)
+
+        ''' <summary>
+        ''' Initializes a new instance of the <see cref="MOLcmd"/> class with the specified mnemonic and description.
+        ''' </summary>
+        ''' <param name="mnemonic">The mnemonic of the command.</param>
+        ''' <param name="description">The description of the command.</param>
         Public Sub New(mnemonic As String, description As String)
             Me.Mnemonic = mnemonic
             Me.Description = description
         End Sub
 
-        Public Sub New(Mnemonic As String, description As String, pc As ParameterCount)
-            Me.Mnemonic = Mnemonic
+        ''' <summary>
+        ''' Initializes a new instance of the <see cref="MOLcmd"/> class with the specified mnemonic, description, and parameter count type.
+        ''' </summary>
+        ''' <param name="mnemonic">The mnemonic of the command.</param>
+        ''' <param name="description">The description of the command.</param>
+        ''' <param name="pc">The parameter count type of the command.</param>
+        Public Sub New(mnemonic As String, description As String, pc As ParameterCount)
+            Me.Mnemonic = mnemonic
             Me.ParameterType = pc
             Me.Description = description
         End Sub
 
-        Public Sub New(Mnemonic As String, description As String, pc As ParameterCount, p As List(Of Parameter))
-            Me.Mnemonic = Mnemonic
+        ''' <summary>
+        ''' Initializes a new instance of the <see cref="MOLcmd"/> class with the specified mnemonic, description, parameter count type, and parameters.
+        ''' </summary>
+        ''' <param name="mnemonic">The mnemonic of the command.</param>
+        ''' <param name="description">The description of the command.</param>
+        ''' <param name="pc">The parameter count type of the command.</param>
+        ''' <param name="p">The list of parameters for the command.</param>
+        Public Sub New(mnemonic As String, description As String, pc As ParameterCount, p As List(Of Parameter))
+            Me.Mnemonic = mnemonic
             Me.Parameters = p
             Me.ParameterType = pc
             Me.Description = description
@@ -256,7 +381,7 @@ Public Class Form1
     Private Const MOL_LASER = &H1000606
     Private Const MOL_LASER1 = &H1000646
     Private Const MOL_LASER2 = &H1000806
-    Private Const MOL_LASER3 = &H1000846
+    Private Const MOL_HOLE = &H1000846
     Private Const MOL_GOSUB = &H1500048
     Private Const MOL_GOSUBb = &H80500008
     Private Const MOL_GOSUB3 = &H3500048
@@ -266,6 +391,7 @@ Public Class Form1
     Private Const MOL_ACCELERATION = &H1004601
     Private Const MOL_BLWR = &H1004A41
     Private Const MOL_BLWRa = &H1004B41
+    Private Const MOL_BLWRb = &H1000B46
     Private Const MOL_SEGMENT = &H500008
 
     Private Const MOL_ENGPWR = &H1000746
@@ -284,60 +410,65 @@ Public Class Form1
     Private Const MOL_UNKNOWN07 = &H3046040      ' unknown command refered to in London Hackspace documents
     Private Const MOL_UNKNOWN09 = &H326040      ' unknown command refered to in London Hackspace documents
 
-    ' Dictionary of all commands
-    Private Commands As New SortedDictionary(Of Integer, LASERcmd) From {
-        {MOL_MVREL, New LASERcmd("MVREL", "Move the cutter by dx,dy", ParameterCount.FIXED, New List(Of Parameter) From {
+    ''' <summary>
+    ''' Dictionary of all MOL commands with their corresponding details.
+    ''' </summary>
+    ''' <remarks>
+    ''' Each command is represented by a unique integer key and a MOLcmd object containing the mnemonic, description, parameter count, and parameters.
+    ''' </remarks>
+    Private Commands As New SortedDictionary(Of Integer, MOLcmd) From {
+        {MOL_MVREL, New MOLcmd("MVREL", "Move the cutter by dx,dy", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "Equivalent to 0x0304, i.e. both x and y", GetType(Int32))},
                             {New Parameter("dx", "delta to move in X direction", GetType(Int32), 1 / xScale, "mm")},
                             {New Parameter("dy", "delta to move in Y direction", GetType(Int32), 1 / yScale, "mm")}
                             }
                            )},
-        {MOL_START, New LASERcmd("START", "A start location for a following subroutine", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_START, New MOLcmd("START", "A start location for a following subroutine", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "Equivalent to 0x0304, i.e. both x and y", GetType(Int32))},
                             {New Parameter("x", "", GetType(Int32), 1 / xScale, "mm")},
                             {New Parameter("y", "", GetType(Int32), 1 / yScale, "mm")}
                             }
                            )},
-        {MOL_SCALE, New LASERcmd("SCALE", "The scale used on all 3 axis", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_SCALE, New MOLcmd("SCALE", "The scale used on all 3 axis", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("x scale", "the X scale", GetType(Float),, "steps/mm")},
                             {New Parameter("y scale", "the Y scale", GetType(Float),, "steps/mm")},
                             {New Parameter("z scale", "the Z scale", GetType(Float),, "steps/mm")}
                             }
                            )},
-        {MOL_ORIGIN, New LASERcmd("ORIGIN", "", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_ORIGIN, New MOLcmd("ORIGIN", "", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "", GetType(Int32))},
                             {New Parameter("x", "", GetType(Int32))},
                             {New Parameter("y", "", GetType(Int32))}
                             }
                            )},
-        {MOTION_CMD_COUNT, New LASERcmd("MOTION_COMMAND_COUNT", "", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOTION_CMD_COUNT, New MOLcmd("MOTION_COMMAND_COUNT", "", ParameterCount.FIXED, New List(Of Parameter) From {
                         {New Parameter("count", "", GetType(Int32))}}
                         )},
-        {MOL_BEGSUB, New LASERcmd("BEGSUB", "Begin of subroutine", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_BEGSUB, New MOLcmd("BEGSUB", "Begin of subroutine", ParameterCount.FIXED, New List(Of Parameter) From {
                         {New Parameter("n", "Subroutine number", GetType(Int32))}}
                         )},
-        {MOL_BEGSUBa, New LASERcmd("BEGSUBa", "Begin of subroutine", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_BEGSUBa, New MOLcmd("BEGSUBa", "Begin of subroutine", ParameterCount.FIXED, New List(Of Parameter) From {
                         {New Parameter("n", "Subroutine number", GetType(Int32))}}
                         )},
-        {MOL_ENDSUB, New LASERcmd("ENDSUB", "End of subroutine", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_ENDSUB, New MOLcmd("ENDSUB", "End of subroutine", ParameterCount.FIXED, New List(Of Parameter) From {
                         {New Parameter("n", "Subroutine number", GetType(Int32))}}
                         )},
-        {MOL_MCBLK, New LASERcmd("MCBLK", "Motion Control Block", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_MCBLK, New MOLcmd("MCBLK", "Motion Control Block", ParameterCount.FIXED, New List(Of Parameter) From {
                         {New Parameter("Size", "Number of words (limited to 510)", GetType(Int32),, "Words")}}
                         )},
-        {MOL_MOTION, New LASERcmd("MOTION", "Set min/max speed & acceleration", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_MOTION, New MOLcmd("MOTION", "Set min/max speed & acceleration", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Initial speed", "", GetType(Float), 1 / xScale, "mm/s")},
                             {New Parameter("Max speed", "", GetType(Float), 1 / xScale, "mm/s")},
                             {New Parameter("Acceleration", "", GetType(Float), 1 / xScale, "mm/s²")}
                             }
                            )},
-        {MOL_SETSPD, New LASERcmd("SETSPD", "Set min/max speed & acceleration", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_SETSPD, New MOLcmd("SETSPD", "Set min/max speed & acceleration", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Initial speed", "", GetType(Float), 1 / xScale, "mm/s")},
                             {New Parameter("Max speed", "", GetType(Float), 1 / xScale, "mm/s")},
                             {New Parameter("Acceleration", "", GetType(Float), 1 / xScale, "mm/s²")}
                             }
                            )},
-        {MOL_PWRSPD5, New LASERcmd("PWRSPD5", "Set Power & Speed", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_PWRSPD5, New MOLcmd("PWRSPD5", "Set Power & Speed", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Start speed", "", GetType(Float), 1 / xScale, "mm/s")},
@@ -345,7 +476,7 @@ Public Class Form1
                             {New Parameter("Unknown", "", GetType(Float))}
                           }
                          )},
-        {MOL_PWRSPD7, New LASERcmd("PWRSPD7", "Set Power & Speed (2 heads)", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_PWRSPD7, New MOLcmd("PWRSPD7", "Set Power & Speed (2 heads)", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Laser 2 Corner PWR", "", GetType(Int32), 0.01, "%")},
@@ -355,91 +486,108 @@ Public Class Form1
                             {New Parameter("Unknown", "", GetType(Float))}
                             }
                          )},
-        {MOL_LASER, New LASERcmd("LASER", "Laser mode control", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_LASER, New MOLcmd("LASER", "Laser mode control", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("Mode", "LASER mode", GetType(LSRMode_Enum))}})},
-        {MOL_LASER1, New LASERcmd("LASER1", "LASER mode", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Mode", "", GetType(LSRMode_Enum))}})},
-        {MOL_LASER2, New LASERcmd("LASER2", "LASER mode", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Mode", "", GetType(LSRMode_Enum))}})},
-        {MOL_LASER3, New LASERcmd("LASER3", "LASER mode", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Mode", "", GetType(LSRMode_Enum))}})},
-        {MOL_GOSUB, New LASERcmd("GOSUB", "Call a subroutine with no parameters", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_LASER1, New MOLcmd("LASER1", "LASER mode", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Mode", "", GetType(LSRMode_Enum))}})},
+        {MOL_LASER2, New MOLcmd("LASER2", "LASER mode", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Mode", "", GetType(LSRMode_Enum))}})},
+        {MOL_HOLE, New MOLcmd("HOLE", "Burn hole", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Radiation Duration", "", GetType(Int32), 1 / PWMFrequency, "s")}})},
+        {MOL_GOSUB, New MOLcmd("GOSUB", "Call a subroutine with no parameters", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "Number of the subroutine", GetType(Int32))}
                             }
                            )},
-        {MOL_GOSUBb, New LASERcmd("GOSUBb", "Call subroutine with 3 parameters", ParameterCount.VARIABLE, New List(Of Parameter) From {
+        {MOL_GOSUBb, New MOLcmd("GOSUBb", "Call subroutine with 3 parameters", ParameterCount.VARIABLE, New List(Of Parameter) From {
                         {New Parameter("n", "Subroutine number", GetType(Int32))},
                         {New Parameter("x", "x parameter", GetType(Float))},
                         {New Parameter("y", "y parameter", GetType(Float))}}
                         )},
-        {MOL_GOSUB3, New LASERcmd("GOSUB3", "Call subroutine with 3 parameters", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_GOSUB3, New MOLcmd("GOSUB3", "Call subroutine with 3 parameters", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "Subroutine number", GetType(Int32))},
                             {New Parameter("x", "x parameter", GetType(Float))},
                             {New Parameter("y", "y parameter", GetType(Float))}
                             }
                            )},
-         {MOL_GOSUBn, New LASERcmd("GOSUBn", "", ParameterCount.VARIABLE, New List(Of Parameter) From {
+         {MOL_GOSUBn, New MOLcmd("GOSUBn", "", ParameterCount.VARIABLE, New List(Of Parameter) From {
                             {New Parameter("n", "Subroutine number", GetType(Int32))},
                             {New Parameter("x", "x parameter", GetType(Float))},
                             {New Parameter("y", "y parameter", GetType(Float))}
                             }
                            )},
-        {MOL_X5_FIRST, New LASERcmd("X5_FIRST", "", ParameterCount.FIXED)},
-        {MOL_X6_LAST, New LASERcmd("X6_LAST", "", ParameterCount.FIXED)},
-        {MOL_SEGMENT, New LASERcmd("SEGMENT", "", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_X5_FIRST, New MOLcmd("X5_FIRST", "", ParameterCount.FIXED)},
+        {MOL_X6_LAST, New MOLcmd("X6_LAST", "", ParameterCount.FIXED)},
+        {MOL_SEGMENT, New MOLcmd("SEGMENT", "", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "", GetType(Int32))}
                             }
                            )},
-        {MOL_ACCELERATION, New LASERcmd("ACCELERATION", "Accelerate or Decelerate", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Acceleration", "", GetType(Acceleration_Enum))}})},
-        {MOL_BLWR, New LASERcmd("BLWR", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(LSRMode_Enum))}})},
-        {MOL_BLWRa, New LASERcmd("BLWRa", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(LSRMode_Enum))}})},
-        {MOL_ENGPWR, New LASERcmd("ENGPWR", "Engrave Power", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Engrave power", "", GetType(Integer), 0.01, "%")}})},
-        {MOL_ENGPWR1, New LASERcmd("ENGPWR1", "", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_ACCELERATION, New MOLcmd("ACCELERATION", "Accelerate or Decelerate", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Acceleration", "", GetType(Acceleration_Enum))}})},
+        {MOL_BLWR, New MOLcmd("BLWR", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
+        {MOL_BLWRa, New MOLcmd("BLWRa", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
+        {MOL_BLWRb, New MOLcmd("BLWRb", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
+        {MOL_ENGPWR, New MOLcmd("ENGPWR", "Engrave Power", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Engrave power", "", GetType(Integer), 0.01, "%")}})},
+        {MOL_ENGPWR1, New MOLcmd("ENGPWR1", "", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("Power", "", GetType(Integer), 0.01, "%")},
                 {New Parameter("??", "", GetType(Integer))}
                 }
               )},
-        {MOL_ENGSPD, New LASERcmd("ENGSPD", "Engrave speed", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_ENGSPD, New MOLcmd("ENGSPD", "Engrave speed", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("Axis", "", GetType(Axis_Enum))},
                 {New Parameter("Speed", "", GetType(Float), 1 / xScale, "mm/s")}
                 }
               )},
-        {MOL_ENGSPD1, New LASERcmd("ENGSPD1", "", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_ENGSPD1, New MOLcmd("ENGSPD1", "", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("Axis", "", GetType(Axis_Enum))},
                 {New Parameter("??", "", GetType(Float))},
                 {New Parameter("Speed", "", GetType(Float), 1 / xScale, "mm/s")},
                 {New Parameter("??", "", GetType(Float))}
                 }
               )},
-        {MOL_ENGMVX, New LASERcmd("ENGMVX", "Engrave one line in the X direction", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_ENGMVX, New MOLcmd("ENGMVX", "Engrave one line in the X direction", ParameterCount.FIXED, New List(Of Parameter) From {
                 {New Parameter("Axis", "", GetType(Axis_Enum))}, {New Parameter("dx", "", GetType(Integer), 1 / xScale, "mm")}}
             )},
-        {MOL_ENGMVY, New LASERcmd("ENGMVY", "Engraving - Move in the Y direction", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_ENGMVY, New MOLcmd("ENGMVY", "Engraving - Move in the Y direction", ParameterCount.FIXED, New List(Of Parameter) From {
         {New Parameter("Axis", "", GetType(Axis_Enum))},
         {New Parameter("dy", "Distance to move", GetType(Integer), 1 / yScale, "mm")}}
         )},
-        {MOL_ENGACD, New LASERcmd("ENGACD", "Engraving (Ac)(De)celeration distance", ParameterCount.FIXED, New List(Of Parameter) From {
+        {MOL_ENGACD, New MOLcmd("ENGACD", "Engraving (Ac)(De)celeration distance", ParameterCount.FIXED, New List(Of Parameter) From {
                     {New Parameter("x", "distance", GetType(Int32), 1 / xScale, "mm")}}
                     )},
-        {MOL_ENGLSR, New LASERcmd("ENGLSR", "Engraving On/Off pattern", ParameterCount.VARIABLE, New List(Of Parameter) From {
+        {MOL_ENGLSR, New MOLcmd("ENGLSR", "Engraving On/Off pattern", ParameterCount.VARIABLE, New List(Of Parameter) From {
                             {New Parameter("List of steps", "List of On/Off patterns", GetType(List(Of OnOffSteps)), 1 / xScale, "mm")}
                             }
                            )},
-        {MOL_END, New LASERcmd("END", "End of code")}
+        {MOL_END, New MOLcmd("END", "End of code")}
         }
 
+    ''' <summary>
+    ''' Reads a 4-byte integer from the input stream.
+    ''' </summary>
+    ''' <returns>The 4-byte integer read from the input stream.</returns>
     Public Function GetInt() As Integer
         ' read 4 byte integer from input stream
         Return reader.ReadInt32
     End Function
 
+    ''' <summary>
+    ''' Reads a 4-byte unsigned integer from the input stream.
+    ''' </summary>
+    ''' <returns>The 4-byte unsigned integer read from the input stream.</returns>
     Public Function GetUInt() As UInteger
         ' read 4 byte uinteger from input stream
         Return reader.ReadUInt32
     End Function
 
+    ''' <summary>
+    ''' Reads a 4-byte integer from the input stream.
+    ''' </summary>
+    ''' <returns>The 4-byte integer read from the input stream.</returns>
     Public Function GetInt(n As Integer) As Integer
         reader.BaseStream.Seek(n, SeekOrigin.Begin)    ' reposition to offset n
         Return GetInt()
     End Function
 
+    ''' <summary>
+    ''' Reads a 4-byte float from the current offset in the input stream.
+    ''' </summary>
+    ''' <returns>The 4-byte float read from the input stream.</returns>
     Public Function GetFloat() As Double
         ' read 4 byte float from current offset
         Return Float2Double(GetUInt())
@@ -451,6 +599,10 @@ Public Class Form1
         Return GetFloat()
     End Function
 
+    ''' <summary>
+    ''' Writes a float to the current offset in the output stream.
+    ''' </summary>
+    ''' <param name="f">The float value to write.</param>
     Public Sub PutFloat(f As Double)
         ' write float at current offset
         If UseMCBLK Then
@@ -459,7 +611,10 @@ Public Class Form1
             writer.Write(Double2Float(f))
         End If
     End Sub
-
+    ''' <summary>
+    ''' Writes an integer to the current offset in the output stream.
+    ''' </summary>
+    ''' <param name="n">The integer value to write.</param>
     Public Sub PutInt(n As Integer)
         ' write n at current offset
         If UseMCBLK Then
@@ -468,7 +623,11 @@ Public Class Form1
             writer.Write(n)
         End If
     End Sub
-
+    ''' <summary>
+    ''' Writes an integer to the specified offset in the output stream.
+    ''' </summary>
+    ''' <param name="n">The integer value to write.</param>
+    ''' <param name="addr">The offset to write the integer to.</param>
     Public Sub PutInt(n As Integer, addr As Integer)
         ' write n at specifed offset
         If UseMCBLK Then
@@ -478,7 +637,10 @@ Public Class Form1
             writer.Write(n)                     ' write data
         End If
     End Sub
-
+    ''' <summary>
+    ''' Displays header information from the input stream.
+    ''' </summary>
+    ''' <param name="textfile">The TextWriter to write the header information to.</param>
     Public Sub DisplayHeader(textfile As TextWriter)
         ' Display header info
         Dim chunk As Integer
@@ -510,14 +672,18 @@ Public Class Form1
         textfile.WriteLine($"Draw chunks: {String.Join(",", DrawChunks.ToArray)}")
         textfile.WriteLine()
     End Sub
-
+    ''' <summary>
+    ''' Decodes a stream of commands from the input stream.
+    ''' </summary>
+    ''' <param name="writer">The StreamWriter to write the decoded commands to.</param>
+    ''' <param name="StartAddress">The start address of the commands to decode.</param>
     Public Sub DecodeStream(writer As System.IO.StreamWriter, StartAddress As Integer)
         ' Decode a stream of commands
         ' StartAddress - start of commands
         ' Set start position for this block
-        Dim block As BLOCKTYPE = GetBlockType(StartAddress)
+        block = GetBlockType(StartAddress)
         Dim cmd = GetInt(StartAddress)
-        If cmd = MOL_BEGSUBa Then
+        If cmd = MOL_BEGSUB Or cmd = MOL_BEGSUBa Then
             Dim subr As Integer = GetInt(StartAddress + 4)      ' extract subroutine number
             If StartPosns.ContainsKey(subr) Then
                 If StartPosns(subr).Absolute Then position = StartPosns(subr).position Else position += StartPosns(subr).position
@@ -536,14 +702,18 @@ Public Class Form1
             Throw New System.Exception($"DecodeStream failed at addr {reader.BaseStream.Position:x8}{vbCrLf}{ex.Message}")
         End Try
     End Sub
-
+    ''' <summary>
+    ''' Decodes a command from the current position in the input stream.
+    ''' </summary>
+    ''' <param name="writer">The StreamWriter to write the decoded command to.</param>
+    ''' <returns>True if more commands follow; otherwise, false.</returns>
     Public Function DecodeCmd(writer As System.IO.StreamWriter) As Boolean
         ' Display a decoded version of the current command
         ' Lookup command in known commands table
         ' returns false if at end of stream
 
         Try
-            Dim value As LASERcmd = Nothing, cmd As Integer, cmd_len As Integer, OneStep As OnOffSteps
+            Dim value As MOLcmd = Nothing, cmd As Integer, cmd_len As Integer, OneStep As OnOffSteps
 
             Dim cmdBegin = reader.BaseStream.Position         ' remember start of command
             writer.Write($"0x{cmdBegin:x}: ")
@@ -575,7 +745,9 @@ Public Class Form1
                     writer.Write($" {p.Name}=")
                     Select Case p.Typ
                         Case GetType(Boolean) : writer.Write(CType(GetInt(), Boolean))
+
                         Case GetType(Int32) : If p.Scale = 1.0 Then writer.Write($"{GetInt()} {p.Units}") Else writer.Write($"{GetInt() * p.Scale:f2} {p.Units}")
+
                         Case GetType(Float)
                             Dim l As New Float(GetInt())
                             Dim val = l.AsDouble      ' get float value
@@ -584,9 +756,27 @@ Public Class Form1
                             Else
                                 writer.Write($"{val * p.Scale:f2} {p.Units}")
                             End If
-                        Case GetType(LSRMode_Enum) : Dim par = GetInt() : If par Mod 2 = 0 Then writer.Write($"Off({par:x})") Else writer.Write($"On({par:x})")
-                        Case GetType(Acceleration_Enum) : writer.Write($"{CType(GetInt(), Acceleration_Enum)}")
-                        Case GetType(Axis_Enum) : writer.Write($"{CType(GetInt(), Axis_Enum)}")
+
+                        Case GetType(OnOff_Enum)
+                            Dim par = GetInt()
+                            Dim val = par And 1         ' only bit0 encodes on/off
+                            writer.Write($"{DirectCast(System.Enum.Parse(GetType(OnOff_Enum), val), OnOff_Enum)} ({par})")
+
+                        Case GetType(LSRMode_Enum)
+                            Dim par = GetInt()
+                            If Not IsValidEnumValue(Of LSRMode_Enum)(par) Then Throw New Exception($"{par} is not a member of enum {GetType(LSRMode_Enum)}")
+                            writer.Write($"{DirectCast(System.Enum.Parse(GetType(LSRMode_Enum), par), LSRMode_Enum)} ({par})")
+
+                        Case GetType(Acceleration_Enum)
+                            Dim par = GetInt()
+                            If Not IsValidEnumValue(Of Acceleration_Enum)(par) Then Throw New Exception($"{par} is not a member of enum {GetType(Acceleration_Enum)}")
+                            writer.Write($"{DirectCast(System.Enum.Parse(GetType(Acceleration_Enum), par), Acceleration_Enum)} ({par})")
+
+                        Case GetType(Axis_Enum)
+                            Dim par = GetInt()
+                            If Not IsValidEnumValue(Of Axis_Enum)(par) Then Throw New Exception($"{par} is not a member of enum {GetType(Axis_Enum)}")
+                            writer.Write($"{DirectCast(System.Enum.Parse(GetType(Axis_Enum), par), Axis_Enum)} ({par})")
+
                         Case GetType(List(Of OnOffSteps))    ' a list of On/Off steps
                             writer.Write($"List of {cmd_len} On/Off steps ")
                             For i = 1 To cmd_len    ' one structure for each word
@@ -617,9 +807,13 @@ Public Class Form1
             Throw New Exception(ex.Message)
         End Try
     End Function
-
+    ''' <summary>
+    ''' Executes a stream of commands, rendering in DXF as we go.
+    ''' </summary>
+    ''' <param name="StartAddress">The start address of the commands to execute.</param>
+    ''' <param name="dxf">The DXF document to render the commands in.</param>
+    ''' <param name="DefaultLayer">The default layer to render the commands in.</param>
     Public Sub ExecuteStream(StartAddress As Integer, dxf As DxfDocument, DefaultLayer As Layer)
-        ' Execute a stream of commands, rendering in dxf as we go
         Dim AddrTrace As New List(Of Integer)
         Dim layer = DefaultLayer
         ' Set start position for this block
@@ -633,11 +827,17 @@ Public Class Form1
             addr = ExecuteCmd(addr, dxf, layer)       ' execute command at addr
         Loop Until addr = 0         ' loop until an END statement
     End Sub
-
+    ''' <summary>
+    ''' Executes a command at the specified address and returns the address of the next instruction.
+    ''' </summary>
+    ''' <param name="addr">The address of the command to execute.</param>
+    ''' <param name="dxf">The DXF document to render the command in.</param>
+    ''' <param name="Layer">The layer to render the command in.</param>
+    ''' <returns>The address of the next instruction.</returns>
     Public Function ExecuteCmd(ByVal addr As Integer, dxf As DxfDocument, ByRef Layer As Layer) As Integer
         ' Execute a command at addr. Return addr as start of next instruction
         Dim cmd As Integer, nWords As Integer, Steps As OnOffSteps
-        Dim block As BLOCKTYPE = GetBlockType(addr)
+        block = GetBlockType(addr)
         Dim i As UInteger
         cmd = GetInt(addr)      ' get the command
 
@@ -658,7 +858,7 @@ Public Class Form1
             Case MOL_MCBLK
                 nWords = 0      ' allow MCBLK content to be executed
 
-            Case MOL_LASER, MOL_LASER1     ' switch laser
+            Case MOL_LASER, MOL_LASER1, MOL_LASER2    ' switch laser
                 ' Laser is changing state. Output any pending motion
                 If motion.Vertexes.Count > 0 Then
                     ' Display any motion
@@ -676,6 +876,20 @@ Public Class Form1
                     Case Else
                         Throw New Exception($"Unknown laser mode {i} @0x{addr:x}")
                 End Select
+
+            Case MOL_HOLE                ' Burn hole
+                Dim duration = GetInt()
+                If duration > 0 Then
+                    Dim circle = New Circle(New Vector2(position.X / xScale, position.Y / yScale), 0.1)
+                    ' Create a hatch entity
+                    Dim hatch As New Hatch(HatchPattern.Solid, False)
+                    hatch.Pattern.Scale = 1.0
+                    ' Add the circle as a boundary to the hatch
+                    hatch.BoundaryPaths.Add(New HatchBoundaryPath(New List(Of EntityObject) From {circle}))
+                    ' Add the entities to the DXF document
+                    dxfBlock.Entities.Add(circle)
+                    dxfBlock.Entities.Add(hatch)
+                End If
 
             Case MOL_SCALE      ' also MOL_SPDPWR, MOL_SPDPWRx
                 xScale = GetFloat() : yScale = GetFloat() : zScale = GetFloat()        ' x,y,z scale command
@@ -850,11 +1064,12 @@ Public Class Form1
                 Dim n As Integer = GetInt()
                 dxfBlock = New Blocks.Block($"Subr {n}")
 
-            Case MOL_ACCELERATION, MOL_SETSPD, MOL_PWRSPD5, MOL_PWRSPD7, MOL_BLWRa, MOL_LASER2, MOL_LASER3, MOL_X5_FIRST, MOL_MOTION, MOL_ENGSPD1, MOL_ENGPWR1
+            Case MOL_ACCELERATION, MOL_SETSPD, MOL_PWRSPD5, MOL_PWRSPD7, MOL_BLWRa, MOL_BLWRb, MOL_X5_FIRST, MOL_MOTION, MOL_ENGSPD1, MOL_ENGPWR1
                 ' Nothing to do
 
             Case Else
-                If Commands.ContainsKey(cmd) Then Throw New Exception($"Unhandled command {Commands(cmd).Mnemonic} @0x{addr:x}") ' Check for un-handled command
+                Dim value As MOLcmd = Nothing
+                If Commands.TryGetValue(cmd, value) Then Throw New Exception($"Unhandled command {value.Mnemonic} @0x{addr:x}") ' Check for un-handled command
                 ' consume all parameters
                 For i = 1 To nWords
                     GetInt()    ' consume parameters
@@ -928,7 +1143,7 @@ Public Class Form1
                 TextBox1.AppendText($" &h{cmd:x8}")
             Next
             ' Display mnemonic if known
-            Dim value As LASERcmd = Nothing
+            Dim value As MOLcmd = Nothing
             If Commands.TryGetValue(cmd, value) Then TextBox1.AppendText($" ({value.Mnemonic})")
             TextBox1.AppendText($"{vbCrLf}")
         End While
@@ -994,13 +1209,13 @@ Public Class Form1
         Dim mode As String, IntervalStr As String
         If My.Settings.Engrave Then
             mode = "E"
-            IntervalStr = $"_{CInt(My.Settings.Interval * 10)}"       ' interval in 0.1 mm units
+            IntervalStr = $"{CInt(My.Settings.Interval * 10)}"       ' interval in 0.1 mm units
         Else
             mode = "C"
             IntervalStr = ""    ' Inverval is only relevant for engrave
         End If
         ' Make filename for output. Restricted to 8.3 format
-        Dim filename = $"TC_{mode}{IntervalStr}.MOL"     ' output file name
+        Dim filename = $"TC{mode}{IntervalStr}.MOL"     ' output file name
         If filename.IndexOf("."c) > 7 Then Throw New Exception($"Filename {filename} is invalid. Not 8.3")
         writer = New BinaryWriter(System.IO.File.Open(filename, FileMode.Create), System.Text.Encoding.Unicode, False)
         dxf = New DxfDocument()     ' create empty DXF file
@@ -1026,18 +1241,35 @@ Public Class Form1
         CutChunk = GetInt()
         DrawChunks.Clear()
         DrawChunks.Add(5)       ' the first draw sub will be 5
+        FileSize = 1000 * BLOCK_SIZE  ' temp value
         reader.Close()
 
+        dxfBlock = New Blocks.Block("Test")        ' create the block for this subroutine
         MakeTestBlock(writer, dxf, Outline, TestLayer)
+        Dim insert As New Insert(dxfBlock)      ' create an insert
+        dxf.Entities.Add(insert)                ' add the insert to Entities
+        dxfBlock = Nothing
+
+        dxfBlock = New Blocks.Block("Cut")        ' create the block for this subroutine
         MakeCutBlock(writer, dxf, CutLine, CutLayer)
+        insert = New Insert(dxfBlock)      ' create an insert
+        dxf.Entities.Add(insert)                ' add the insert to Entities
+        dxfBlock = Nothing
+
+        dxfBlock = New Blocks.Block("Engrave")        ' create the block for this subroutine
         MakeEngraveBlock(writer, dxf, GridLine, EngraveLayer, Speeds, Powers)
+        insert = New Insert(dxfBlock)      ' create an insert
+        dxf.Entities.Add(insert)                ' add the insert to Entities
+        dxfBlock = Nothing
+
+        dxfBlock = New Blocks.Block("Text")        ' create the block for this subroutine
         MakeTextBlock(writer, dxf, GridLine, TextLayer, Speeds, Powers)
+        insert = New Insert(dxfBlock)      ' create an insert
+        dxf.Entities.Add(insert)                ' add the insert to Entities
+        dxfBlock = Nothing
 
         dxf.Save("Test card.dxf")       ' save the DXF file
 
-        ' make binary file a multiple of BLOCK_SIZE
-        Dim LastBlock = CInt(writer.BaseStream.Length \ BLOCK_SIZE)       '  current length of file in blocks
-        writer.BaseStream.SetLength((LastBlock + 1) * BLOCK_SIZE)       ' round up to next block
         ' Now update template values
         FlushMCBLK(False)     ' just in case
         ' HEADER
@@ -1057,11 +1289,11 @@ Public Class Form1
             WriteMOL(MOL_START, {772, StartPosns(i).position.X, StartPosns(i).position.Y})
             WriteMOL(MOL_GOSUBn, {3, i, 0, 0})
         Next
-        WriteMOL(MOL_LASER3, {LSRMode_Enum.Off})
+        WriteMOL(MOL_LASER1, {LSRMode_Enum.Off})
         ' add GOSUBn 603
         WriteMOL(MOL_GOSUBn, {3, 603, 0, 0})
         ' end the config block
-        PutInt(MOL_END)
+        EndBlock()        ' pad to end of block with 0
 
         writer.Close()
         TextBox1.AppendText($"Done - output in {filename}")
@@ -1075,7 +1307,7 @@ Public Class Form1
         WriteMOL(&H80600148, {6, &H25B, &H91D4000, &HF13A300, &H1113A340, &H101D7A80, &HF716C00})   ' Unknown command
         DrawBox(writer, dxf, outline, layer,,, testSpeed)
         WriteMOL(MOL_ENDSUB, {1})
-        WriteMOL(MOL_END)
+        EndBlock()        ' pad to end of block with 0
     End Sub
     ''' <summary>
     ''' Make the Cut block
@@ -1092,9 +1324,18 @@ Public Class Form1
         DrawBox(writer, dxf, outline, layer, False, ClipBoxPower, ClipBoxSpeed)
         FlushMCBLK(False)
         WriteMOL(MOL_ENDSUB, {2})
-        WriteMOL(MOL_END)
+        EndBlock()        ' pad to end of block with 0
     End Sub
 
+    ''' <summary>
+    ''' Creates an engraving block in the DXF document and writes corresponding MOL commands.
+    ''' </summary>
+    ''' <param name="writer">The BinaryWriter to write the MOL commands to.</param>
+    ''' <param name="dxf">The DXF document to add the engraving block to.</param>
+    ''' <param name="outline">The outline rectangle for the engraving block.</param>
+    ''' <param name="layer">The layer to add the engraving block to.</param>
+    ''' <param name="speeds">An array of speeds for the engraving block.</param>
+    ''' <param name="powers">An array of powers for the engraving block.</param>
     Public Sub MakeEngraveBlock(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, layer As Layer, speeds() As Integer, powers() As Integer)
 
         ' Create engraving as SUBR 3. Subroutine engraves a single cell
@@ -1112,7 +1353,7 @@ Public Class Form1
         ' boxes are drawn top down
 
         For power = 0 To powers.Length - 1
-            For speed = speeds.Length - 1 To 0 Step -1
+            For speed = 0 To speeds.Length - 1
                 Dim cell = New Rect(New System.Windows.Point(outline.Left + power * cellsize.Width, outline.Top + speed * cellsize.Height), cellsize)  ' one 10x10 cell
                 cell = Rect.Inflate(cell, -0.75, -0.75)       ' shrink it a bit to create a margin
                 DrawBox(writer, dxf, cell, layer, My.Settings.Engrave, powers(power), speeds(speed))
@@ -1122,9 +1363,18 @@ Public Class Form1
         WriteMOL(&H1000B46, {&H200})         ' unknown command
         WriteMOL(&H1000B46, {&H200})         ' unknown command
         WriteMOL(MOL_ENDSUB, {3})    ' end SUB 
-        WriteMOL(MOL_END)
+        EndBlock()        ' pad to end of block with 0
     End Sub
 
+    ''' <summary>
+    ''' Creates a text block in the DXF document and writes corresponding MOL commands.
+    ''' </summary>
+    ''' <param name="writer">The BinaryWriter to write the MOL commands to.</param>
+    ''' <param name="dxf">The DXF document to add the text block to.</param>
+    ''' <param name="Outline">The outline rectangle for the text block.</param>
+    ''' <param name="layer">The layer to add the text block to.</param>
+    ''' <param name="speeds">An array of speeds for the text block.</param>
+    ''' <param name="powers">An array of powers for the text block.</param>
     Public Sub MakeTextBlock(writer As BinaryWriter, dxf As DxfDocument, Outline As Rect, layer As Layer, speeds() As Integer, powers() As Integer)
         ' Create Text layer as SUBR 4
         Dim StartofBlock = (writer.BaseStream.Position \ BLOCK_SIZE + 1) * BLOCK_SIZE   ' address of start of next block
@@ -1148,9 +1398,15 @@ Public Class Form1
         ' Finish block
         FlushMCBLK(False)
         WriteMOL(MOL_ENDSUB, {4})    ' end SUB 
-        WriteMOL(MOL_END)
+        EndBlock()        ' pad to end of block with 0
     End Sub
-
+    ''' <summary>
+    ''' Writes a MOL command with optional parameters to the output stream.
+    ''' </summary>
+    ''' <param name="command">The MOL command to write.</param>
+    ''' <param name="Parameters">Optional parameters for the command.</param>
+    ''' <param name="posn">Optional position to write the command to. If not specified, writes at the current position.</param>
+    ''' <exception cref="System.Exception">Thrown if there is a parameter mismatch or unsupported parameter type.</exception>
     Public Sub WriteMOL(command As Integer, Optional ByVal Parameters() As Object = Nothing, Optional posn As Integer = -1)
         ' Write a MOL command, with parameters to MOL file
         ' Parameters are written in scaled values
@@ -1158,7 +1414,7 @@ Public Class Form1
         ' writing occurs at current writer position, or "posn" if present
         If UseMCBLK And posn <> -1 Then Throw New System.Exception($"You can't write explicitly to address {posn:x} as an MCBLK in in operation")
 
-        Dim value As LASERcmd = Nothing        ' Check the correct number of parameters
+        Dim value As MOLcmd = Nothing        ' Check the correct number of parameters
         If Commands.TryGetValue(command, value) Then
             ' It is a known command, therefore do some checks
             Dim nWords = value.Parameters.Count
@@ -1200,23 +1456,28 @@ Public Class Form1
                     Case GetType(Acceleration_Enum), GetType(LSRMode_Enum), GetType(Axis_Enum)
                         PutInt(p)
                     Case Else
-                        Throw New System.Exception($"WRITEMOL Parameter of unsupported type {p.GetType}")
+                        Throw New System.Exception($"WRITEMOL: Parameter of unsupported type {p.GetType}")
                 End Select
             Next
         End If
-        ' Count the number of MOL_MVREL, MOL_UNKNOWN07 & MOL_UNKNOWN09 commands
+
         Select Case command
-            Case MOL_MVREL, MOL_UNKNOWN07, MOL_UNKNOWN09
+            Case MOL_MVREL, MOL_UNKNOWN07, MOL_UNKNOWN09        ' Count the number of MOL_MVREL, MOL_UNKNOWN07 & MOL_UNKNOWN09 commands
                 MVRELCnt += 1
+            Case MOL_LASER, MOL_LASER1, MOL_LASER2  ' track mode of laser
+                If Parameters(0) Is Nothing Then Throw New Exception($"{value.Mnemonic}: Laser mode not set")
+                LaserMode = Parameters(0)
         End Select
         If MCBLK.Count >= MCBLKMax Then
             FlushMCBLK(True)      ' MCBLK limited in size
         End If
     End Sub
 
+    ''' <summary>
+    ''' Flushes the contents of the MCBLK (Motion Control Block) buffer to the writer.
+    ''' </summary>
+    ''' <param name="KeepOpen">If true, keeps the MCBLK buffer open after flushing; otherwise, closes it.</param>
     Public Sub FlushMCBLK(KeepOpen As Boolean)
-        ' Flush the contents of the MCBLK.
-        ' The state of UseMCBLK will be updated to KeepOpen when complete
         If MCBLK.Count > 0 Then
             ' Disable MCBLK buffering
             UseMCBLK = False
@@ -1331,8 +1592,14 @@ Public Class Form1
     Public Sub MoveRelativeSplit(delta As System.Windows.Point, speed As Double)
         MoveRelativeSplit(CType(delta, IntPoint), speed)       ' convert mm to steps
     End Sub
+
+    ''' <summary>
+    ''' Creates a move command from the current position by the specified delta.
+    ''' The move is split into multiple segments to handle acceleration and deceleration.
+    ''' </summary>
+    ''' <param name="delta">The distance to move, specified as an IntPoint.</param>
+    ''' <param name="speed">The speed of the movement in mm/s.</param>
     Public Sub MoveRelativeSplit(delta As IntPoint, speed As Double)
-        ' Create a move command from the current position to p
         ' Pieces = 2 or 3
         ' Accelerate before first one
         ' Decelerate before last one
@@ -1341,6 +1608,7 @@ Public Class Form1
         Dim moves As New List(Of IntPoint)
 
         ' Work out whether we can do a 2 part move, or it's too long and we need 3
+
         If delta = ZERO Then Return     ' we're already there
         Dim Accel = IIf(LaserMode = LSRMode_Enum.Off, SpaceAcc, WorkAcc)   ' Acceleration differs if laser is on or not
         Dim T = (speed - StartSpeed) / Accel       ' T =(max speed-initial speed)/acceleration time taken to reach QuickSpeed
@@ -1348,16 +1616,17 @@ Public Class Form1
         ' Calculate 2 or 3 part move
         Dim Dist = delta.Length         ' distance to move
 
-        If S > Dist / 2 Or (LaserMode = LSRMode_Enum.Off) Then
+        If S > Dist / 2 Or block = BLOCKTYPE.TEST Or block = BLOCKTYPE.CUT Or LaserMode = LSRMode_Enum.Off Then     ' move in 2 steps
             ' we can get more than halfway if we needed, so 2 pieces enough
-            ' We do it this way to avoid rounding errors
+            ' only Accelerate till halfway, then decelerate
+
             Dim delta1 = New IntPoint(delta.X / 2, delta.Y / 2)
             moves.Add(delta1)
-            Dim delta2 = delta - delta1
+            Dim delta2 = delta - delta1     ' We do it this way to avoid rounding errors
             moves.Add(delta2)
         Else
             ' we can't make it halfway whilst accelerating, so will need to coast
-            Dim ratio = S / Dist        ' percentage of accelerate/decelerate phases
+            Dim ratio As Double = S / Dist        ' percentage of accelerate/decelerate phases
             Dim delta1 = New IntPoint(delta.X * ratio, delta.Y * ratio)
             Dim delta2 = New IntPoint(delta.X * (1 - 2 * ratio), delta.Y * (1 - 2 * ratio))
             Dim delta3 = delta - delta1 - delta2
@@ -1379,15 +1648,19 @@ Public Class Form1
             WriteMOL(MOL_MVREL, {772, moves(m).X, moves(m).Y})
         Next
         position += delta      ' update position
-
     End Sub
 
+    ''' <summary>
+    ''' Draws a box in the DXF document and writes corresponding MOL commands.
+    ''' </summary>
+    ''' <param name="writer">The BinaryWriter to write the MOL commands to.</param>
+    ''' <param name="dxf">The DXF document to add the box to.</param>
+    ''' <param name="outline">The outline rectangle for the box.</param>
+    ''' <param name="Layer">The layer to add the box to.</param>
+    ''' <param name="shaded">If true, the box will be shaded (engraved); otherwise, it will be a simple outline.</param>
+    ''' <param name="power">The power setting for the laser (percentage).</param>
+    ''' <param name="speed">The speed of the movement in mm/s.</param>
     Public Sub DrawBox(writer As BinaryWriter, dxf As DxfDocument, outline As Rect, Layer As Layer, Optional shaded As Boolean = False, Optional power As Integer = 0, Optional speed As Double = 150)
-        ' Draw a box
-        ' outline is a rect defining the box in steps
-        ' power as %
-        ' speed as mm/sec
-        ' Boxes start at the BottomRight.
         ' Non shaded are drawn anti-clockwise, ending at the start point
         ' Shaded boxes end where the engraving ends
         ' if power or speed are 0, don't turn laser on
@@ -1419,22 +1692,22 @@ Public Class Form1
             UseMCBLK = True     ' open MCB
             WriteMOL(&H1000B06, {&H201})        ' Unknown magic command
             ' Ordinary box with 4 sides
-            Dim block = GetBlockType(writer.BaseStream.Position)    ' get block type   
-            If block = BLOCKTYPE.DRAW Or block = BLOCKTYPE.CUT Then LaserMode = LSRMode_Enum.Cut : WriteMOL(MOL_LASER, {LaserMode}) : 
-            If block = BLOCKTYPE.DRAW Then
-                ' We are cutting, so use precise cut line
-                CutLinePrecise(New IntPoint(-outline.Width * xScale, 0), speed, WorkAcc)
-                CutLinePrecise(New IntPoint(0, -outline.Height * yScale), speed, WorkAcc)
-                CutLinePrecise(New IntPoint(outline.Width * xScale, 0), speed, WorkAcc)
-                CutLinePrecise(New IntPoint(0, outline.Height * yScale), speed, WorkAcc)
-            Else
-                ' Use quick and dirty method to move/cut
-                MoveRelativeSplit(New System.Windows.Point(-outline.Width, 0), speed)
-                MoveRelativeSplit(New System.Windows.Point(0, -outline.Height), speed)
-                MoveRelativeSplit(New System.Windows.Point(outline.Width, 0), speed)
-                MoveRelativeSplit(New System.Windows.Point(0, outline.Height), speed)
-            End If
-            If LaserMode <> LSRMode_Enum.Off Then LaserMode = LSRMode_Enum.Off : WriteMOL(MOL_LASER, {LaserMode})     ' Turn laser off
+            block = GetBlockType(writer.BaseStream.Position)    ' get block type   
+            If block = BLOCKTYPE.DRAW Or block = BLOCKTYPE.CUT Then WriteMOL(MOL_LASER, {LSRMode_Enum.Cut}) : 
+            'If block = BLOCKTYPE.DRAW Then
+            '    ' We are cutting, so use precise cut line
+            '    CutLinePrecise(New IntPoint(-outline.Width * xScale, 0), speed, WorkAcc)
+            '    CutLinePrecise(New IntPoint(0, -outline.Height * yScale), speed, WorkAcc)
+            '    CutLinePrecise(New IntPoint(outline.Width * xScale, 0), speed, WorkAcc)
+            '    CutLinePrecise(New IntPoint(0, outline.Height * yScale), speed, WorkAcc)
+            'Else
+            ' Use quick and dirty method to move/cut
+            MoveRelativeSplit(New System.Windows.Point(-outline.Width, 0), speed)
+            MoveRelativeSplit(New System.Windows.Point(0, -outline.Height), speed)
+            MoveRelativeSplit(New System.Windows.Point(outline.Width, 0), speed)
+            MoveRelativeSplit(New System.Windows.Point(0, outline.Height), speed)
+            'End If
+            If LaserMode <> LSRMode_Enum.Off Then WriteMOL(MOL_LASER, {LSRMode_Enum.Off})     ' Turn laser off
             FlushMCBLK(False)       ' close MCB
             WriteMOL(&H1000B06, {&H200})        ' Unknown magic command
             WriteMOL(&H1000B06, {&H200})        ' Unknown magic command
@@ -1474,16 +1747,19 @@ Public Class Form1
             ' Move to start of engraving
             DXF_line(position, position + delta, MoveLayer)     ' move to start
             MoveRelativeSplit(delta, speed)
-            WriteMOL(MOL_LASER1, {LSRMode_Enum.Engrave})     ' turn laser on engrave mode?
+            WriteMOL(MOL_LASER1, {LSRMode_Enum.Engrave})     ' turn laser on engrave mode
             Dim Steps As OnOffSteps                 ' construct steps as on for cellwidth, and off for 0
             Steps.OnSteps = outline.Width * xScale
             Steps.OffSteps = 0
             WriteMOL(MOL_ENGACD, {engacd})     ' define the acceleration start distance
             WriteMOL(&H1000246, {0})            ' unknown
             WriteMOL(MOL_ENGSPD, {Axis_Enum.X, Float.Encode(speed * xScale)})          ' define speed
+            WriteMOL(MOL_ENGSPD1, {Axis_Enum.X, Float.Encode(7559.0), Float.Encode(speed * xScale), Float.Encode(881889.0)})          ' define speed
             WriteMOL(&H2010041, {3, &HB6C3000})     ' unknown
             WriteMOL(MOL_PWRSPD5, {power * 100, power * 100, Float.Encode(0.0), Float.Encode(speed * xScale), Float.Encode(0.0)})
             WriteMOL(MOL_ENGPWR, {power * 100})             ' define power
+            WriteMOL(MOL_PWRSPD7, {power * 100, power * 100, power * 100, power * 100, Float.Encode(5 * xScale), Float.Encode(speed * xScale), Float.Encode(0.0)})    ' set power & speed
+            WriteMOL(MOL_ENGPWR1, {power * 100, 6000})
             WriteMOL(&H1000B46, {&H201})                    ' unknown
             Dim OnOffTotal As Integer = engacd * 2 + Steps.OnSteps + Steps.OffSteps
             Dim OnOffOnly As Integer = Steps.OnSteps + Steps.OffSteps   ' only on/off step distance
@@ -1513,6 +1789,16 @@ Public Class Form1
         End If
     End Sub
 
+    ''' <summary>
+    ''' Draws text in the DXF document and writes corresponding MOL commands.
+    ''' </summary>
+    ''' <param name="writer">The BinaryWriter to write the MOL commands to.</param>
+    ''' <param name="dxf">The DXF document to add the text to.</param>
+    ''' <param name="text">The text to draw.</param>
+    ''' <param name="alignment">The text alignment (Left, Center, Right).</param>
+    ''' <param name="origin">The origin point for the text.</param>
+    ''' <param name="fontsize">The font size of the text in mm.</param>
+    ''' <param name="angle">The rotation angle of the text in degrees.</param>
     Public Sub DrawText(writer As BinaryWriter, dxf As DxfDocument, text As String, alignment As System.Windows.TextAlignment, origin As System.Windows.Point, fontsize As Double, angle As Double)
         ' Write some text at specified size, position and angle
 
@@ -1557,7 +1843,7 @@ Public Class Form1
             Dim delta As IntPoint = StartPoint - position
             If delta <> ZERO Then
                 DXF_line(position, position + delta, MoveLayer)
-                MoveRelativeSplit(delta, TextSpeed)      ' move in 2 segments
+                MoveRelativeSplit(delta, QuickSpeed)      ' move in 2 segments
             End If
             WriteMOL(MOL_LASER, {LSRMode_Enum.Cut})
             ' Process all vertexes, except the first
@@ -1802,7 +2088,7 @@ Public Class Form1
             TextFile.WriteLine("Command frequency")
             TextFile.WriteLine()
             For Each cmd In CommandUsage
-                Dim value As LASERcmd = Nothing, decode As String
+                Dim value As MOLcmd = Nothing, decode As String
                 If Commands.TryGetValue(cmd.Key, value) Then decode = value.Mnemonic Else decode = $"0x{cmd.Key:x8}"
                 TextFile.WriteLine($"{decode}  {cmd.Value}")
             Next
@@ -1966,7 +2252,6 @@ Public Class Form1
         MCBLKCount = 0
         MVRELCnt = 0
         ChunksWithCode.Clear()
-        FontData.Clear()
         position = ZERO
         LaserMode = LSRMode_Enum.Off
         AccelLength = 0
@@ -2109,7 +2394,7 @@ Public Class Form1
         Const LetterSpacing = 3       ' space between letters
         Dim Width As Double
         Dim Strokes As List(Of Polyline2D)
-        Dim utf8Encoding As New System.Text.UTF8Encoding()
+        Dim utf8Encoding As New UTF8Encoding()
         Dim encodedString() As Byte
         Dim baseline As Integer = 0             ' X position of next character
         Dim result As New List(Of Polyline2D)
@@ -2212,12 +2497,12 @@ Public Class Form1
         Dim stroke As Polyline2D, LastVertex As Polyline2DVertex
 
         Dim FontPath = My.Settings.FontPath
-        If Not System.IO.Directory.Exists(FontPath) Then
+        If Not Directory.Exists(FontPath) Then
             MsgBox($"The font path {FontPath} cannot be found. Please use the parameters dialog to set one.", vbAbort + vbOK, "Font folder not found")
             Exit Sub
         Else
             Dim FontFile = My.Settings.FontFile
-            If Not System.IO.File.Exists($"{FontPath}\{FontFile}") Then
+            If Not File.Exists($"{FontPath}\{FontFile}") Then
                 MsgBox($"The font file {FontFile} cannot be found. Please use the parameters dialog to set one.", vbAbort + vbOK, "Font file not found")
                 Exit Sub
             Else
@@ -2454,8 +2739,70 @@ Public Class Form1
         position = New IntPoint(100, 200)
         delta = New IntPoint(6000, 8000)
         CutLinePrecise(delta, 50, 500)
-        WriteMOL(MOL_END)
+        EndBlock()        ' pad to end of block with 0
         writer.Close()
+        TextBox1.AppendText("Done")
+    End Sub
+
+    Private Sub EndBlock()
+        ' Pad the block to the end with 0
+        Dim pos = writer.BaseStream.Position
+        Dim pad = (BLOCK_SIZE - (pos Mod BLOCK_SIZE)) / 4       ' Words of padding required
+        For i = 1 To pad
+            WriteMOL(0)
+        Next
+    End Sub
+
+    Private Sub FindCommandToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles FindCommandToolStripMenuItem.Click
+        ' Search all .MOL files for specific command
+        ' display location and parameters
+        Dim cmd_len As Integer, target As Integer
+
+        Dim hex As String = InputBox("Input command in hex", "")
+        Try
+            target = Convert.ToInt32(hex, 16)
+        Catch ex As Exception
+            MsgBox($"Invalid input. {ex.Message}", vbExclamation + vbOKOnly, "Error")
+        End Try
+        TextBox1.Clear()
+        TextBox1.AppendText($"Searching for command 0x{target:x8}{vbCrLf}")
+        Dim workingDirectory = Environment.CurrentDirectory
+        Dim projectDirectory = Directory.GetParent(workingDirectory).Parent.Parent.FullName
+        Dim molFiles As String() = Directory.GetFiles(projectDirectory, "*.mol", SearchOption.AllDirectories)
+
+        For Each fi In molFiles
+            TextBox1.AppendText($"Searching {fi}{vbCrLf}")
+            Dim stream = System.IO.File.Open(fi, FileMode.Open)
+            reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
+            Dim drawchunk = GetInt(&H7C)
+            DrawChunks.Clear()
+            While drawchunk <> 0
+                DrawChunks.Add(drawchunk)
+                drawchunk = GetInt()
+            End While
+            For Each chunk In DrawChunks        ' look in all chunks
+                reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
+                Dim addr = reader.BaseStream.Position
+                Dim cmd = GetInt()
+                While cmd <> MOL_END
+                    cmd_len = cmd >> 24 And &HFF    ' length of command
+                    If cmd_len = &H80 Then
+                        cmd_len = GetInt() And &H1FF    ' length of command
+                    End If
+                    If cmd = target Then
+                        TextBox1.AppendText($"Found at 0x{addr:x}: ({cmd_len}) ")
+                        For i = 1 To cmd_len : TextBox1.AppendText($" 0x{GetUInt():x8}") : Next
+                        TextBox1.AppendText(vbCrLf)
+                    Else
+                        If cmd = MOL_MCBLK Then cmd_len = 1             ' process contents of MCBLK
+                        For i = 1 To cmd_len : GetInt() : Next ' consume command
+                    End If
+                    addr = reader.BaseStream.Position
+                    cmd = GetInt()
+                End While
+            Next
+            reader.Close()
+        Next
         TextBox1.AppendText("Done")
     End Sub
 End Class

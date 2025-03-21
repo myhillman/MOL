@@ -15,6 +15,12 @@ Friend Module Utilities
 
     Public ScaleUnity = New Matrix3(1, 0, 0, 0, 1, 0, 0, 0, 1)             ' scale factor of 1
     Public ScaleMM = New Matrix3(1 / Form1.xScale, 0, 0, 0, 1 / Form1.yScale, 0, 0, 0, 0)    ' scale steps to mm
+
+    ''' <summary>
+    ''' Converts a custom Leetro floating-point format to an IEEE 754 floating-point number.
+    ''' </summary>
+    ''' <param name="b">The Leetro floating-point number represented as a Long.</param>
+    ''' <returns>The equivalent IEEE 754 floating-point number as a Single.</returns>
     Public Function Float2Double(b As Long) As Single
         ' Converts a custom Leetro floating-point format to an IEEE 754 floating-point number.
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
@@ -29,6 +35,11 @@ Friend Module Utilities
         Return ieee.f   ' return floating point
     End Function
 
+    ''' <summary>
+    ''' Converts an IEEE 754 floating-point number to a custom Leetro floating-point format.
+    ''' </summary>
+    ''' <param name="f">The IEEE 754 floating-point number as a Single.</param>
+    ''' <returns>The equivalent Leetro floating-point number represented as an Integer.</returns>
     Public Function Double2Float(f As Single) As Integer
         ' Convert integer to Leetro float
         ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
@@ -48,6 +59,21 @@ Friend Module Utilities
         Return ieee.i
     End Function
 
+    ''' <summary>
+    ''' For a given speed, returns the dependent cutter parameters.
+    ''' </summary>
+    ''' <param name="speed">The speed for which to get the engrave parameters.</param>
+    ''' <returns>
+    ''' A tuple containing the following parameters:
+    ''' <list type="bullet">
+    ''' <item><description>Acclen: Acceleration length.</description></item>
+    ''' <item><description>AccSpace: Acceleration space.</description></item>
+    ''' <item><description>StartSpd: Start speed.</description></item>
+    ''' <item><description>Acc: Acceleration.</description></item>
+    ''' <item><description>YSpeed: Y-axis speed.</description></item>
+    ''' </list>
+    ''' </returns>
+    ''' <exception cref="System.Exception">Thrown when the speed is outside the supported range.</exception>
     Public Function EngraveParameters(speed As Double) As (Acclen As Double, AccSpace As Double, StartSpd As Double, Acc As Double, YSpeed As Double)
         ' For a given speed, return dependant cutter parameters
         Select Case speed
@@ -63,6 +89,13 @@ Friend Module Utilities
                 Throw New System.Exception($"Cannot provide engrave parameters for speed of {speed}")
         End Select
     End Function
+    ''' <summary>
+    ''' Converts speed and power values to an approximate color.
+    ''' </summary>
+    ''' <param name="power">The power value as a percentage.</param>
+    ''' <param name="speed">The speed value in mm/s.</param>
+    ''' <returns>An AciColor representing the combined power and speed values.</returns>
+    ''' <exception cref="System.Exception">Thrown when the power or speed exceeds the maximum allowed values.</exception>
     Public Function PowerSpeedColor(power As Single, speed As Single) As AciColor
         ' Convert speed/power to an approximate color
         'Return AciColor.FromHsl(30 / 360, 0.6, CSng(power / 100) * (1 - (CSng(speed) / My.Settings.SpeedMax)))
@@ -75,10 +108,23 @@ Friend Module Utilities
         Return AciColor.FromHsl(0, 0, lum)
     End Function
 
+    ''' <summary>
+    ''' Calculates the distance between two points represented by IntPoint structures.
+    ''' </summary>
+    ''' <param name="p1">The first point.</param>
+    ''' <param name="p2">The second point.</param>
+    ''' <returns>The distance between the two points as a Single.</returns>
     Public Function Distance(p1 As IntPoint, p2 As IntPoint) As Single
         ' Calculate the distance between two points
         Return Math.Sqrt((p1.X - p2.X) ^ 2 + (p1.Y - p2.Y) ^ 2)
     End Function
+
+    ''' <summary>
+    ''' Calculates the distance between two points represented by Vector2 structures.
+    ''' </summary>
+    ''' <param name="p1">The first point.</param>
+    ''' <param name="p2">The second point.</param>
+    ''' <returns>The distance between the two points as a Single.</returns>
     Public Function Distance(p1 As Vector2, p2 As Vector2) As Single
         ' Calculate the distance between two points
         Return Math.Sqrt((p1.X - p2.X) ^ 2 + (p1.Y - p2.Y) ^ 2)
@@ -89,6 +135,15 @@ Friend Module Utilities
         Return deg * Math.PI / 180.0
     End Function
 
+    ''' <summary>
+    ''' Given a vector startpoint, endpoint, and bulge, creates a Polyline2D representing the bulge points.
+    ''' </summary>
+    ''' <param name="startpoint">The starting point of the bulge.</param>
+    ''' <param name="Endpoint">The ending point of the bulge.</param>
+    ''' <param name="bulge">The bulge value, which determines the curvature of the arc.</param>
+    ''' <param name="numpoints">The number of points to generate along the arc. Default is 10.</param>
+    ''' <returns>A Polyline2D representing the bulge points.</returns>
+    ''' <exception cref="System.Exception">Thrown when the bulge value is infeasibly large.</exception>
     Function GenerateBulge(startpoint As Vector2, Endpoint As Vector2, bulge As Double, Optional numpoints As Integer = 10) As Polyline2D
         ' Given a vector startpoint, endpoint and bulge, create a Polyline2D representing the bulge points
         ' The arc will contain numpoints points, default 10

@@ -45,9 +45,10 @@ Partial Class Form1
         BoxTestToolStripMenuItem = New ToolStripMenuItem()
         ConvertLeetroToIEEEToolStripMenuItem = New ToolStripMenuItem()
         FontTestToolStripMenuItem = New ToolStripMenuItem()
+        TestCutlineToolStripMenuItem = New ToolStripMenuItem()
         TextBox1 = New TextBox()
         ProgressBar1 = New ProgressBar()
-        TestCutlineToolStripMenuItem = New ToolStripMenuItem()
+        FindCommandToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
@@ -148,7 +149,7 @@ Partial Class Form1
         ' 
         ' TestToolStripMenuItem
         ' 
-        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, FontTestToolStripMenuItem, TestCutlineToolStripMenuItem})
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, FontTestToolStripMenuItem, TestCutlineToolStripMenuItem, FindCommandToolStripMenuItem})
         TestToolStripMenuItem.Name = "TestToolStripMenuItem"
         TestToolStripMenuItem.Size = New Size(40, 20)
         TestToolStripMenuItem.Text = "Test"
@@ -195,6 +196,12 @@ Partial Class Form1
         FontTestToolStripMenuItem.Size = New Size(244, 22)
         FontTestToolStripMenuItem.Text = "Font test"
         ' 
+        ' TestCutlineToolStripMenuItem
+        ' 
+        TestCutlineToolStripMenuItem.Name = "TestCutlineToolStripMenuItem"
+        TestCutlineToolStripMenuItem.Size = New Size(244, 22)
+        TestCutlineToolStripMenuItem.Text = "Test Cutline"
+        ' 
         ' TextBox1
         ' 
         TextBox1.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
@@ -213,11 +220,11 @@ Partial Class Form1
         ProgressBar1.Size = New Size(1023, 21)
         ProgressBar1.TabIndex = 2
         ' 
-        ' TestCutlineToolStripMenuItem
+        ' FindCommandToolStripMenuItem
         ' 
-        TestCutlineToolStripMenuItem.Name = "TestCutlineToolStripMenuItem"
-        TestCutlineToolStripMenuItem.Size = New Size(244, 22)
-        TestCutlineToolStripMenuItem.Text = "Test Cutline"
+        FindCommandToolStripMenuItem.Name = "FindCommandToolStripMenuItem"
+        FindCommandToolStripMenuItem.Size = New Size(244, 22)
+        FindCommandToolStripMenuItem.Text = "Find command"
         ' 
         ' Form1
         ' 
@@ -263,5 +270,6 @@ Partial Class Form1
     Friend WithEvents FontTestToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents CommandSpreadsheetToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents TestCutlineToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents FindCommandToolStripMenuItem As ToolStripMenuItem
 
 End Class
