@@ -1,6 +1,5 @@
 ﻿Imports System.ComponentModel
 Imports System.IO
-Imports System.Windows.Controls
 
 Public Class TestPanel
     Private material As String, interval As Single, passes As Integer, speedMin As Integer, speedMax As Integer, powerMin As Integer, powerMax As Integer

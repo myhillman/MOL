@@ -5,10 +5,23 @@ Imports netDxf.Entities
 
 ' Miscellaneous SHARED routines that don't belong in a class
 Friend Module Utilities
-    ' Create a union so that a float can be accessed as a UInt
-    <StructLayout(LayoutKind.Explicit)> Public Structure IntFloatUnion
+
+    ''' <summary>
+    ''' Represents a union that allows a float to be accessed as an integer and vice versa.
+    ''' This is useful for low-level manipulation of floating-point numbers, such as converting
+    ''' between custom floating-point formats and IEEE 754 format.
+    ''' </summary>
+    <StructLayout(LayoutKind.Explicit)>
+    Public Structure IntFloatUnion
+        ''' <summary>
+        ''' The integer representation of the floating-point number.
+        ''' </summary>
         <FieldOffset(0)>
         Public i As Integer
+
+        ''' <summary>
+        ''' The floating-point representation of the integer.
+        ''' </summary>
         <FieldOffset(0)>
         Public f As Single
     End Structure
@@ -130,6 +143,11 @@ Friend Module Utilities
         Return Math.Sqrt((p1.X - p2.X) ^ 2 + (p1.Y - p2.Y) ^ 2)
     End Function
 
+    ''' <summary>
+    ''' Converts an angle from degrees to radians.
+    ''' </summary>
+    ''' <param name="deg">The angle in degrees.</param>
+    ''' <returns>The angle in radians.</returns>
     Public Function DegToRad(deg As Double) As Double
         ' convert degrees to radians
         Return deg * Math.PI / 180.0

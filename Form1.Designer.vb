@@ -63,7 +63,7 @@ Partial Class Form1
         ' 
         ' OpenToolStripMenuItem
         ' 
-        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {DisassembleToolStripMenuItem, RenderToolStripMenuItem, MakeTestCardToolStripMenuItem, TestCardParametersToolStripMenuItem, DXFMetricsToolStripMenuItem, ReconstructMINIMARIOMOLToolStripMenuItem, CommandSpreadsheetToolStripMenuItem, ExitToolStripMenuItem})
+        OpenToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {DisassembleToolStripMenuItem, RenderToolStripMenuItem, MakeTestCardToolStripMenuItem, TestCardParametersToolStripMenuItem, DXFMetricsToolStripMenuItem, ReconstructMINIMARIOMOLToolStripMenuItem, CommandSpreadsheetToolStripMenuItem, FindCommandToolStripMenuItem, ExitToolStripMenuItem})
         OpenToolStripMenuItem.Name = "OpenToolStripMenuItem"
         OpenToolStripMenuItem.Size = New Size(37, 20)
         OpenToolStripMenuItem.Text = "File"
@@ -149,7 +149,7 @@ Partial Class Form1
         ' 
         ' TestToolStripMenuItem
         ' 
-        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, FontTestToolStripMenuItem, TestCutlineToolStripMenuItem, FindCommandToolStripMenuItem})
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, FontTestToolStripMenuItem, TestCutlineToolStripMenuItem})
         TestToolStripMenuItem.Name = "TestToolStripMenuItem"
         TestToolStripMenuItem.Size = New Size(40, 20)
         TestToolStripMenuItem.Text = "Test"
@@ -223,8 +223,8 @@ Partial Class Form1
         ' FindCommandToolStripMenuItem
         ' 
         FindCommandToolStripMenuItem.Name = "FindCommandToolStripMenuItem"
-        FindCommandToolStripMenuItem.Size = New Size(244, 22)
-        FindCommandToolStripMenuItem.Text = "Find command"
+        FindCommandToolStripMenuItem.Size = New Size(233, 22)
+        FindCommandToolStripMenuItem.Text = "Find Command"
         ' 
         ' Form1
         ' 
