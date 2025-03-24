@@ -241,10 +241,13 @@ End Structure
 ''' </summary>
 Public Class Form1
     Private Const BLOCK_SIZE = 512          ' bytes. MOL is divided into blocks or chunks
+    Private Const MOLTemplate = "16SQ.MOL"  ' template on which to base created MOL files
     Private debugflag As Boolean = True
     Private hexdump As Boolean = False
     Private dlg = New OpenFileDialog
-    Private stream As FileStream, reader As BinaryReader, writer As BinaryWriter
+    Private stream As FileStream
+    Private reader As BinaryReader
+    Private writer As BinaryWriter
 
     Private startposn As IntPoint
     Private delta As IntPoint       ' a delta from position
@@ -270,9 +273,12 @@ Public Class Form1
     ' Header information
     Private FileSize As Integer         ' length of file in bytes
     Private MotionBlocks As Integer
-    Private TopRight As IntPoint, BottomLeft As IntPoint
+    Private TopRight As IntPoint
+    Private BottomLeft As IntPoint
     Private Version As String
-    Private ConfigChunk As Integer, TestChunk As Integer, CutChunk As Integer
+    Private ConfigChunk As Integer
+    Private TestChunk As Integer
+    Private CutChunk As Integer
     Private DrawChunks As New List(Of Integer)(10)     ' list of draw chunks
 
     ' Variables that reflect the state of the laser cutter
@@ -284,14 +290,13 @@ Public Class Form1
     Private SpaceAcc As Double = 1200       ' Acceleration whilst just moving
     Private ClipBoxPower As Integer = 40    ' power setting for Cut box
     Private ClipBoxSpeed As Integer = 25    ' speed setting for Cut box
-    Private LaserMode As LSRMode_Enum = LSRMode_Enum.Off  ' current laser beam mode
+    Private LaserMode As LSRMode_Enum       ' current laser beam mode
     Private block As BLOCKTYPE              ' current block type
 
-    Private position As IntPoint    ' current laser head position in mm
+    Private position As IntPoint            ' current laser head position in steps
     Public xScale As Double = 125.9842519685039    ' X axis steps/mm.   From the Worktable config dialog [Pulse Unit] parameter
     Public yScale As Double = 125.9842519685039    ' Y axis steps/mm
     Public zScale As Double = 125.9842519685039    ' Z axis steps/mm
-    Friend ScaleToSteps = New Matrix(xScale, 0.0, 0.0, yScale, 0.0, 0.0)       ' matrix to scale mm to steps
     Private AccelLength As Double      ' Acceleration and Deceleration distance
     Private CurrentSubr As Integer = 0                ' current subroutine we are in
     Private StartPosns As New Dictionary(Of Integer, (Absolute As Boolean, position As IntPoint))      ' start position for drawing by subroutine #
@@ -490,6 +495,7 @@ Public Class Form1
     Private Const MOL_ENGACD = &H1000346
     Private Const MOL_ENGMVY = &H2010040
     Private Const MOL_ENGMVX = &H2014040
+    Private Const MOL_GRDADJ = &H80000B46
     Private Const MOL_SCALE = &H3000E46
     Private Const MOL_PWRSPD5 = &H5000E46
     Private Const MOL_PWRSPD7 = &H7000E46
@@ -633,15 +639,18 @@ Public Class Form1
                 {New Parameter("Axis", "", GetType(Axis_Enum))}, {New Parameter("dx", "", GetType(Integer), 1 / xScale, "mm")}}
             )},
         {MOL_ENGMVY, New MOLcmd("ENGMVY", "Engraving - Move in the Y direction", ParameterCount.FIXED, New List(Of Parameter) From {
-        {New Parameter("Axis", "", GetType(Axis_Enum))},
-        {New Parameter("dy", "Distance to move", GetType(Integer), 1 / yScale, "mm")}}
+                {New Parameter("Axis", "", GetType(Axis_Enum))},
+                {New Parameter("dy", "Distance to move", GetType(Integer), 1 / yScale, "mm")}}
+                )},
+        {MOL_GRDADJ, New MOLcmd("GRDADJ", "Grade Adjustment table", ParameterCount.VARIABLE, New List(Of Parameter) From {
+                {New Parameter("??", "", GetType(Int32))},
+                {New Parameter("ramp", "Grade engrave power steps", GetType(List(Of Integer)), 0.01, "W")}}
         )},
         {MOL_ENGACD, New MOLcmd("ENGACD", "Engraving (Ac)(De)celeration distance", ParameterCount.FIXED, New List(Of Parameter) From {
                     {New Parameter("x", "distance", GetType(Int32), 1 / xScale, "mm")}}
                     )},
         {MOL_ENGLSR, New MOLcmd("ENGLSR", "Engraving On/Off pattern", ParameterCount.VARIABLE, New List(Of Parameter) From {
-                            {New Parameter("List of steps", "List of On/Off patterns", GetType(List(Of OnOffSteps)), 1 / xScale, "mm")}
-                            }
+                            {New Parameter("List of steps", "List of On/Off patterns", GetType(List(Of OnOffSteps)), 1 / xScale, "mm")}}
                            )},
         {MOL_END, New MOLcmd("END", "End of code")}
         }
@@ -815,12 +824,12 @@ Public Class Form1
         writer.WriteLine()
         ' position = StartPosns(block)
         reader.BaseStream.Seek(StartAddress, SeekOrigin.Begin)      ' Start of block
-        Try
-            Do
+        'Try
+        Do
             Loop Until Not DecodeCmd(writer)
-        Catch ex As Exception
-            Throw New System.Exception($"DecodeStream failed at addr {reader.BaseStream.Position:x8}{vbCrLf}{ex.Message}")
-        End Try
+        'Catch ex As Exception
+        '    Throw New Exception($"DecodeStream failed at addr {reader.BaseStream.Position:x8}{vbCrLf}{ex.Message}")
+        'End Try
     End Sub
     ''' <summary>
     ''' Decodes a command from the current position in the input stream.
@@ -832,10 +841,11 @@ Public Class Form1
         ' Lookup command in known commands table
         ' returns false if at end of stream
 
-        Try
-            Dim value As MOLcmd = Nothing, cmd As Integer, cmd_len As Integer, OneStep As OnOffSteps
+        Dim value As MOLcmd = Nothing, cmd As Integer, cmd_len As Integer, OneStep As OnOffSteps, cmdBegin As Integer, p As Parameter, n As Integer
+        Dim i1 As Integer, i2 As Integer, i3 As Integer, par As Integer
 
-            Dim cmdBegin = reader.BaseStream.Position         ' remember start of command
+        Try
+            cmdBegin = reader.BaseStream.Position         ' remember start of command
             writer.Write($"0x{cmdBegin:x}: ")
             cmd = GetInt()                  ' get command
             If Not CommandUsage.TryAdd(cmd, 1) Then CommandUsage(cmd) += 1      ' count commands used
@@ -857,13 +867,13 @@ Public Class Form1
             If MCBLKCounter > 0 And cmd <> MOL_MCBLK Then writer.Write(" >")     ' prefix MCBLK with indicator
             If Commands.TryGetValue(cmd, value) Then
                 If value.ParameterType = ParameterCount.FIXED And cmd_len <> value.Parameters.Count And cmd <> MOL_MCBLK Then
-                    Throw New System.Exception($"Command {value.Mnemonic}: length is {cmd_len}, but data table says {value.Parameters.Count}")
+                    Throw New Exception($"Command {value.Mnemonic}: length is {cmd_len}, but data table says {value.Parameters.Count}")
                 End If
 
                 writer.Write($" {value.Mnemonic}")
 
                 For n = 1 To cmd_len  ' number of parameters. Some commands have a variable number of parameters
-                    Dim p = value.Parameters(n - 1)     ' get the parameter
+                    p = value.Parameters(n - 1)     ' get the parameter
                     writer.Write($" {p.Name}=")
                     Select Case p.Typ
                         Case GetType(Boolean) : writer.Write(CType(GetInt(), Boolean))
@@ -880,34 +890,44 @@ Public Class Form1
                             End If
 
                         Case GetType(OnOff_Enum)
-                            Dim par = GetInt()
+                            par = GetInt()
                             Dim val = par And 1         ' only bit0 encodes on/off
                             writer.Write($"{DirectCast(System.Enum.Parse(GetType(OnOff_Enum), val), OnOff_Enum)} ({par})")
 
                         Case GetType(LSRMode_Enum)
-                            Dim par = GetInt()
+                            par = GetInt()
                             If Not IsValidEnumValue(Of LSRMode_Enum)(par) Then Throw New Exception($"{par} is not a member of enum {GetType(LSRMode_Enum)}")
                             writer.Write($"{DirectCast(System.Enum.Parse(GetType(LSRMode_Enum), par), LSRMode_Enum)} ({par})")
 
                         Case GetType(Acceleration_Enum)
-                            Dim par = GetInt()
+                            par = GetInt()
                             If Not IsValidEnumValue(Of Acceleration_Enum)(par) Then Throw New Exception($"{par} is not a member of enum {GetType(Acceleration_Enum)}")
                             writer.Write($"{DirectCast(System.Enum.Parse(GetType(Acceleration_Enum), par), Acceleration_Enum)} ({par})")
 
                         Case GetType(Axis_Enum)
-                            Dim par = GetInt()
+                            par = GetInt()
                             If Not IsValidEnumValue(Of Axis_Enum)(par) Then Throw New Exception($"{par} is not a member of enum {GetType(Axis_Enum)}")
                             writer.Write($"{DirectCast(System.Enum.Parse(GetType(Axis_Enum), par), Axis_Enum)} ({par})")
 
                         Case GetType(List(Of OnOffSteps))    ' a list of On/Off steps
                             writer.Write($"List of {cmd_len} On/Off steps ")
-                            For i = 1 To cmd_len    ' one structure for each word
+                            For i1 = 1 To cmd_len    ' one structure for each word
                                 OneStep.Steps = GetInt()     ' get 32 bit word
                                 writer.Write($" {OneStep.OnSteps * p.Scale:f1}/{OneStep.OffSteps * p.Scale:f1} {p.Units}")
                             Next
+                            Exit For ' all parameters have been consumed
+
                         Case GetType(OnOffSteps)    ' a  On/Off steps
                             OneStep.Steps = GetInt()     ' get 32 bit word
                             writer.Write($" One On/Off step {OneStep.OnSteps * p.Scale:f1}/{OneStep.OffSteps * p.Scale:f1} {p.Units}")
+
+                        Case GetType(List(Of Integer))    ' a list of integer
+                            writer.Write($"List of {cmd_len - 1} Power levels ")
+                            For i2 = 2 To cmd_len    ' one structure for each word
+                                writer.Write($" {GetInt() * p.Scale:f1} {p.Units}")
+                            Next
+                            Exit For ' all parameters have been consumed
+
                         Case Else
                             Throw New System.Exception($"{value.Mnemonic}: Unrecognised parameter type of {p.Typ}")
                     End Select
@@ -915,17 +935,18 @@ Public Class Form1
             Else
                 ' UNKNOWN command. Just show parameters
                 writer.Write($" Unknown: 0x{cmd:x8} Params {cmd_len}: ")
-                For i = 1 To cmd_len
-                    Dim n As Integer = GetInt()
+                For i3 = 1 To cmd_len
+                    n = GetInt()
                     writer.Write($" 0x{n:x8}")
                     If n < 0 Or n > 500 Then writer.Write($" ({Float2Double(n)}f)")
                 Next
             End If
-            writer.WriteLine()
+            writer.WriteLine() : writer.Flush()
             'reader.BaseStream.Seek(cmdBegin + cmd_len * 4 + 4,  SeekOrigin.Begin)       ' move to next command
             If cmd <> MOL_MCBLK Then MCBLKCounter -= (cmd_len + 1)
             Return True         ' more commands follow
         Catch ex As Exception
+            MsgBox($"cmd={cmd:x8} @0x{reader.BaseStream.Position:x8}", vbCritical + vbOK, "Error")
             Throw New Exception(ex.Message)
         End Try
     End Function
@@ -1111,7 +1132,7 @@ Public Class Form1
                 position += delta      ' move position along
 
             Case MOL_ENGLSR     ' engraving movement
-                'ENGLSRsteps.Clear()
+                ENGLSRsteps.Clear()
                 For i = 1 To nWords
                     Steps.Steps = GetInt()      ' get 2 16 bit values, accessable through OnSteps & OffSteps
                     ENGLSRsteps.Add(Steps)
@@ -1275,8 +1296,8 @@ Public Class Form1
 
     Private Sub WordAccessToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles WordAccessToolStripMenuItem.Click
         Dim value As Integer, value1() As Byte
-        Dim stream = System.IO.File.Open(dlg.filename, FileMode.Open)
-        Dim reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
+        stream = System.IO.File.Open(dlg.filename, FileMode.Open)
+        reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
         value = reader.ReadInt32
         value = reader.ReadInt32
         value1 = reader.ReadBytes(4)
@@ -1345,8 +1366,8 @@ Public Class Form1
         dxf = New DxfDocument()     ' create empty DXF file
 
         ' Copy the first 5 blocks of a template file to initialise the new MOL file
-        Dim ReadStream = System.IO.File.Open("16SQ.MOL", FileMode.Open)           ' file containing template blocks
-        reader = New BinaryReader(ReadStream, System.Text.Encoding.Unicode, False)
+        stream = System.IO.File.Open(MOLTemplate, FileMode.Open)           ' file containing template blocks
+        reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
         GetHeader()
         reader.BaseStream.Seek(0, SeekOrigin.Begin)            ' set reader to start of file
         writer.Seek(0, SeekOrigin.Begin)            ' set reader to start of file
@@ -2331,54 +2352,77 @@ Public Class Form1
         End If
     End Sub
 
+    ''' <summary>
+    ''' Initializes all variables and clears any existing data.
+    ''' This method is called to reset the state of the application before processing a new file.
+    ''' </summary>
     Public Sub Initialise()
-        ' Initialise all variables
-
+        ' Initialize file streams and readers/writers
         stream = Nothing
         reader = Nothing
         writer = Nothing
+
+        ' Initialize header information
         TopRight = New IntPoint(0, 0)
         BottomLeft = New IntPoint(0, 0)
         startposn = New IntPoint(0, 0)
         delta = New IntPoint(0, 0)
         ZERO = New IntPoint(0, 0)
         position = ZERO
+
+        ' Clear command usage statistics
         CommandUsage.Clear()
+
+        ' Initialize steps array and stack
         StepsArray = Nothing
         Stack.Clear()
+
+        ' Initialize drawing layer and MCBLK buffer
         layer = Nothing
         MCBLK.Clear()
         UseMCBLK = False
         MCBLKCount = 0
         MVRELCnt = 0
+
+        ' Clear chunks with code and reset position
         ChunksWithCode.Clear()
         position = ZERO
+
+        ' Initialize laser mode and acceleration length
         LaserMode = LSRMode_Enum.Off
         AccelLength = 0
+
+        ' Initialize subroutine information
         CurrentSubr = 0
         StartPosns.Clear()
         SubrAddrs.Clear()
+
+        ' Initialize chunk addresses
         ConfigChunk = 0
         TestChunk = 0
         CutChunk = 0
         DrawChunks.Clear()
+
+        ' Initialize engraving steps and flags
         ENGLSRsteps.Clear()
         FirstMove = True
         EngPower = 0
         EngSpeed = 0
         MVRELInConfig = 0
         MCBLKCounter = 0
+
+        ' Clear the text box for output
         TextBox1.Clear()
-        DrawChunks.Clear()
-        ' Create initial start positions
-        SubrAddrs.Clear()
-        ' Subr 1 & 2 are TEST & CUT
-        ' Setup some start positions
+
+        ' Initialize start positions for subroutines
         StartPosns.Clear()
         StartPosns.Add(1, (True, New IntPoint(0, 0)))
         StartPosns.Add(2, (True, New IntPoint(0, 0)))
+
+        ' Clear chunks with code
         ChunksWithCode.Clear()
     End Sub
+
     Private Sub BoxTestToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles BoxTestToolStripMenuItem.Click
         writer = New BinaryWriter(System.IO.File.Open("BoxTest.bin", FileMode.Create), System.Text.Encoding.Unicode, False)
         Dim outline = New Rect(-200, -100, 60, 60)
@@ -2396,16 +2440,28 @@ Public Class Form1
         dxf.Save("LineTest.dxf")
     End Sub
 
+    ''' <summary>
+    ''' Handles the click event for the "Convert Leetro to IEEE" menu item.
+    ''' Prompts the user to input a Leetro float in hex format, converts it to an IEEE float, and displays the result.
+    ''' </summary>
+    ''' <param name="sender">The source of the event.</param>
+    ''' <param name="e">The event data.</param>
     Private Sub ConvertLeetroToIEEEToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ConvertLeetroToIEEEToolStripMenuItem.Click
-        Dim hex As String = InputBox("Input Leetro float in hex format", "")
+        ' Prompt the user to input a Leetro float in hex format
+        Dim hex As String = InputBox("Input Leetro float in hex format", "Convert Leetro float to Double")
         Try
+            ' Convert the input hex string to a UInt32 value
             Dim value As UInt32 = Convert.ToUInt32(hex, 16)
+            ' Convert the Leetro float to an IEEE float
             Dim float = Float2Double(value)
+            ' Display the result in a message box
             MsgBox($"The value of 0x{hex} as a Leetro float is {float}", vbInformation + vbOKOnly, "Conversion to float")
         Catch ex As Exception
+            ' Display an error message if the input is invalid
             MsgBox($"Invalid input. {ex.Message}", vbExclamation + vbOKOnly, "Error")
         End Try
     End Sub
+
     Enum ReaderState
         Idle
         ReadVertexes
@@ -2762,6 +2818,7 @@ Public Class Form1
                 Select Case typ
                     Case "System.Int32" : typ = "Int32"
                     Case "System.Collections.Generic.List`1[MOL.OnOffSteps]" : typ = "List(Of OnOffSteps)"
+                    Case "System.Collections.Generic.List`1[MOL.Int32]" : typ = "List(Of Integer)"
                 End Select
                 worksheet.Rows(row).Cells("G").Value = typ
                 worksheet.Rows(row).Cells("H").Value = p.Scale
@@ -2845,7 +2902,7 @@ Public Class Form1
         writer = New BinaryWriter(System.IO.File.Open("TestCutLine.mol", FileMode.Create), System.Text.Encoding.Unicode, False)
 
         ' Copy the first 5 blocks of a template file to initialise the new MOL file
-        Dim ReadStream = System.IO.File.Open("line_d_10.MOL", FileMode.Open)           ' file containing template blocks
+        Dim ReadStream = System.IO.File.Open(MOLTemplate, FileMode.Open)           ' file containing template blocks
         reader = New BinaryReader(ReadStream, System.Text.Encoding.Unicode, False)
         writer.Seek(0, SeekOrigin.Begin)            ' set reader to start of file
         buffer = reader.ReadBytes(BLOCK_SIZE)      ' read header
@@ -2891,7 +2948,7 @@ Public Class Form1
         ' display location and parameters
         Dim cmd_len As Integer, target As Integer, count As Integer = 0, Mnemonic As String = "", chunks As List(Of Integer)
 
-        Dim command As String = InputBox("Input command name or hex value", "")
+        Dim command As String = InputBox("Input command name or hex value", "Find command in all .MOL files")
         command = UCase(command)
         If command.StartsWith("0X") Then command = command.Remove(0, 2)         ' remove hex prefix
         ' First check if it's a mnemonic
