@@ -11,6 +11,7 @@ Imports System.Text.RegularExpressions
 Imports System.Text
 Imports System.Windows.Ink
 Imports GemBox.Spreadsheet
+Imports SixLabors.ImageSharp.Drawing
 
 ' Create a pseudo type to handle Leetro floating point numbers in a more natural way
 ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
@@ -85,6 +86,41 @@ Public Structure Float
     End Function
 End Structure
 
+''' <summary>
+''' Represents a power level value encapsulated as an integer multiplied by 100.
+''' </summary>
+Public Structure PowerLevel
+    ''' <summary>
+    ''' The power level value represented as an integer multiplied by 100.
+    ''' </summary>
+    Property Value As Integer
+
+    ''' <summary>
+    ''' Initializes a new instance of the <see cref="PowerLevel"/> structure from a percentage value.
+    ''' </summary>
+    ''' <param name="percentage">The power value as a percentage.</param>
+    Public Sub New(percentage As Integer)
+        Value = percentage * 100
+    End Sub
+
+    ''' <summary>
+    ''' Gets the power value as a percentage.
+    ''' </summary>
+    ''' <returns>The power value as a percentage.</returns>
+    Public ReadOnly Property Percentage As Integer
+        Get
+            Return Value \ 100
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' Returns a string that represents the current object.
+    ''' </summary>
+    ''' <returns>A string that represents the current object.</returns>
+    Public Overrides Function ToString() As String
+        Return $"{Percentage}%"
+    End Function
+End Structure
 ''' <summary>
 ''' Represents the different types of blocks used in the application.
 ''' </summary>
@@ -564,16 +600,16 @@ Public Class Form1
                             }
                            )},
         {MOL_PWRSPD5, New MOLcmd("PWRSPD5", "Set Power & Speed", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
-                            {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
+                            {New Parameter("Corner PWR", "", GetType(PowerLevel), 0.01, "%")},
+                            {New Parameter("Max PWR", "", GetType(PowerLevel), 0.01, "%")},
                             {New Parameter("Start speed", "", GetType(Float), 1 / xScale, "mm/s")},
                             {New Parameter("Max speed", "", GetType(Float), 1 / xScale, "mm/s")},
                             {New Parameter("Unknown", "", GetType(Float))}
                           }
                          )},
         {MOL_PWRSPD7, New MOLcmd("PWRSPD7", "Set Power & Speed (2 heads)", ParameterCount.FIXED, New List(Of Parameter) From {
-                            {New Parameter("Corner PWR", "", GetType(Int32), 0.01, "%")},
-                            {New Parameter("Max PWR", "", GetType(Int32), 0.01, "%")},
+                            {New Parameter("Corner PWR", "", GetType(PowerLevel), 0.01, "%")},
+                            {New Parameter("Max PWR", "", GetType(PowerLevel), 0.01, "%")},
                             {New Parameter("Laser 2 Corner PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Laser 2 Max PWR", "", GetType(Int32), 0.01, "%")},
                             {New Parameter("Start speed", "", GetType(Float), 1 / xScale, "mm/s")},
@@ -617,9 +653,9 @@ Public Class Form1
         {MOL_BLWR, New MOLcmd("BLWR", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
         {MOL_BLWRa, New MOLcmd("BLWRa", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
         {MOL_BLWRb, New MOLcmd("BLWRb", "Blower control", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("On/Off", "", GetType(OnOff_Enum))}})},
-        {MOL_ENGPWR, New MOLcmd("ENGPWR", "Engrave Power", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Engrave power", "", GetType(Integer), 0.01, "%")}})},
+        {MOL_ENGPWR, New MOLcmd("ENGPWR", "Engrave Power", ParameterCount.FIXED, New List(Of Parameter) From {{New Parameter("Engrave power", "", GetType(PowerLevel), 0.01, "%")}})},
         {MOL_ENGPWR1, New MOLcmd("ENGPWR1", "", ParameterCount.FIXED, New List(Of Parameter) From {
-                {New Parameter("Power", "", GetType(Integer), 0.01, "%")},
+                {New Parameter("Power", "", GetType(PowerLevel), 0.01, "%")},
                 {New Parameter("??", "", GetType(Integer))}
                 }
               )},
@@ -644,7 +680,7 @@ Public Class Form1
                 )},
         {MOL_GRDADJ, New MOLcmd("GRDADJ", "Grade Adjustment table", ParameterCount.VARIABLE, New List(Of Parameter) From {
                 {New Parameter("??", "", GetType(Int32))},
-                {New Parameter("ramp", "Grade engrave power steps", GetType(List(Of Integer)), 0.01, "W")}}
+                {New Parameter("ramp", "Grade engrave power steps", GetType(List(Of PowerLevel)), 0.01, "%")}}
         )},
         {MOL_ENGACD, New MOLcmd("ENGACD", "Engraving (Ac)(De)celeration distance", ParameterCount.FIXED, New List(Of Parameter) From {
                     {New Parameter("x", "distance", GetType(Int32), 1 / xScale, "mm")}}
@@ -826,7 +862,7 @@ Public Class Form1
         reader.BaseStream.Seek(StartAddress, SeekOrigin.Begin)      ' Start of block
         'Try
         Do
-            Loop Until Not DecodeCmd(writer)
+        Loop Until Not DecodeCmd(writer)
         'Catch ex As Exception
         '    Throw New Exception($"DecodeStream failed at addr {reader.BaseStream.Position:x8}{vbCrLf}{ex.Message}")
         'End Try
@@ -842,7 +878,7 @@ Public Class Form1
         ' returns false if at end of stream
 
         Dim value As MOLcmd = Nothing, cmd As Integer, cmd_len As Integer, OneStep As OnOffSteps, cmdBegin As Integer, p As Parameter, n As Integer
-        Dim i1 As Integer, i2 As Integer, i3 As Integer, par As Integer
+        Dim i1 As Integer, i2 As Integer, i3 As Integer, par As Integer, pwr As PowerLevel
 
         Try
             cmdBegin = reader.BaseStream.Position         ' remember start of command
@@ -921,10 +957,15 @@ Public Class Form1
                             OneStep.Steps = GetInt()     ' get 32 bit word
                             writer.Write($" One On/Off step {OneStep.OnSteps * p.Scale:f1}/{OneStep.OffSteps * p.Scale:f1} {p.Units}")
 
-                        Case GetType(List(Of Integer))    ' a list of integer
+                        Case GetType(PowerLevel)    ' a list of integer
+                            pwr.Value = GetInt()     ' get 32 bit word
+                            writer.Write($" {pwr.Percentage:f1} {p.Units}")
+
+                        Case GetType(List(Of PowerLevel))    ' a list of integer
                             writer.Write($"List of {cmd_len - 1} Power levels ")
                             For i2 = 2 To cmd_len    ' one structure for each word
-                                writer.Write($" {GetInt() * p.Scale:f1} {p.Units}")
+                                pwr.Value = GetInt()     ' get 32 bit word
+                                writer.Write($" {pwr.Percentage:f1} {p.Units}")
                             Next
                             Exit For ' all parameters have been consumed
 
@@ -2761,133 +2802,206 @@ Public Class Form1
 
         ' Create a new Excel workbook and add a worksheet named "Commands"
         Dim workbook As New ExcelFile
-        Dim worksheet = workbook.Worksheets.Add("Commands")
 
+        Dim row As Integer, col As Integer, columnCount As Integer
         ' Define cell styles for horizontal and vertical alignment
         Dim HorizCenteredStyle = New CellStyle With {
             .HorizontalAlignment = HorizontalAlignmentStyle.Center
         }
         Dim VertCenteredStyle = New CellStyle With {
-            .VerticalAlignment = VerticalAlignmentStyle.Center
-        }
-
-        ' Add headers to the worksheet
-        Dim row = 0
-        Dim col = 0
-        For Each h In {"Code", "Mnemonic", "Description", "Parameters"}
-            worksheet.Cells(row, col).Value = h
-            col += 1
-        Next
-
-        ' Add second row of headers for parameters
-        row = 1
-        col = 3
-        For Each h In {"#", "Description", "Name", "Type", "Scale", "Units"}
-            worksheet.Cells(row, col).Value = h
-            col += 1
-        Next
-
-        ' Merge cells for the "Parameters" header and apply horizontal centering
-        With worksheet.Cells.GetSubrange("D1:I1")
-            .Merged = True
-            .Style = HorizCenteredStyle
-        End With
-
-        ' Apply heading style to the first two rows
-        worksheet.Rows("1").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
-        worksheet.Rows("2").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
-
-        ' Populate the worksheet with command data
-        row = 2
-        ' Sort the commands dictionary by the low 24 bits of the command code
-        Dim sorted = From item In Commands
-                     Order By item.Key And &HFFFFFF
-                     Select item
-        For Each c In sorted
-            ' Populate the rows with command data
-            worksheet.Rows(row).Cells("A").Value = $"0x{c.Key:x8}"
-            worksheet.Rows(row).Cells("B").Value = c.Value.Mnemonic
-            worksheet.Rows(row).Cells("C").Value = c.Value.Description
-            Dim pNum = 1
-            For Each p In c.Value.Parameters
-                worksheet.Rows(row).Cells("D").Value = $"p{pNum}"
-                worksheet.Rows(row).Cells("E").Value = p.Description
-                worksheet.Rows(row).Cells("F").Value = p.Name
-                Dim typ = p.Typ.ToString
-                If typ.StartsWith("MOL.") Then typ = typ.Substring(4)    ' remove MOL qualifier
-                Select Case typ
-                    Case "System.Int32" : typ = "Int32"
-                    Case "System.Collections.Generic.List`1[MOL.OnOffSteps]" : typ = "List(Of OnOffSteps)"
-                    Case "System.Collections.Generic.List`1[MOL.Int32]" : typ = "List(Of Integer)"
-                End Select
-                worksheet.Rows(row).Cells("G").Value = typ
-                worksheet.Rows(row).Cells("H").Value = p.Scale
-                worksheet.Rows(row).Cells("I").Value = p.Units
-
-                pNum += 1
-                row += 1
+                .VerticalAlignment = VerticalAlignmentStyle.Center
+            }
+        Dim worksheet = workbook.Worksheets.Add("Commands")
+        With worksheet
+            ' Add headers to the worksheet
+            row = 0
+            col = 0
+            For Each h In {"Code", "Mnemonic", "Description", "Parameters"}
+                .Cells(row, col).Value = h
+                col += 1
             Next
 
-            ' Merge cells for commands with multiple parameters
-            Dim pars = c.Value.Parameters.Count
-            If pars > 1 Then
-                For col = 0 To 2
-                    Dim Mstart = A1(row - pars, col)
-                    Dim Mend = A1(row - 1, col)
-                    With worksheet.Cells.GetSubrange($"{Mstart}:{Mend}")
-                        .Merged = True
-                        .Style = VertCenteredStyle
-                    End With
+            ' Add second row of headers for parameters
+            row = 1
+            col = 3
+            For Each h In {"#", "Description", "Name", "Type", "Scale", "Units"}
+                .Cells(row, col).Value = h
+                col += 1
+            Next
+
+            ' Merge cells for the "Parameters" header and apply horizontal centering
+            With .Cells.GetSubrange("D1:I1")
+                .Merged = True
+                .Style = HorizCenteredStyle
+            End With
+
+            ' Apply heading style to the first two rows
+            .Rows("1").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+            .Rows("2").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+
+            ' Populate the worksheet with command data
+            row = 2
+            ' Sort the commands dictionary by the low 24 bits of the command code
+            Dim sorted = From item In Commands
+                         Order By item.Key And &HFFFFFF
+                         Select item
+            For Each c In sorted
+                ' Populate the rows with command data
+                .Rows(row).Cells("A").Value = $"0x{c.Key:x8}"
+                .Rows(row).Cells("B").Value = c.Value.Mnemonic
+                .Rows(row).Cells("C").Value = c.Value.Description
+                Dim pNum = 1
+                For Each p In c.Value.Parameters
+                    .Rows(row).Cells("D").Value = $"p{pNum}"
+                    .Rows(row).Cells("E").Value = p.Description
+                    .Rows(row).Cells("F").Value = p.Name
+                    Dim typ = p.Typ.ToString
+                    If typ.StartsWith("MOL.") Then typ = typ.Substring(4)    ' remove MOL qualifier
+                    Select Case typ
+                        Case "System.Int32" : typ = "Int32"
+                    End Select
+                    ' Look for Generic.List types, and extract base type
+                    Dim matches = Regex.Match(typ, "^System.Collections.Generic.List`1\[MOL.(.*)\]$")
+                    If matches.Success Then
+                        typ = $"List(Of {matches.Groups(1)})"
+                    End If
+                    .Rows(row).Cells("G").Value = typ
+                    .Rows(row).Cells("H").Value = p.Scale
+                    .Rows(row).Cells("I").Value = p.Units
+
+                    pNum += 1
+                    row += 1
                 Next
-            End If
-            row += 1
-        Next
 
-        ' Apply number format to the "Scale" column
-        worksheet.Columns("H").Style.NumberFormat = NumberFormatBuilder.Number(5)
+                ' Merge cells for commands with multiple parameters
+                Dim pars = c.Value.Parameters.Count
+                If pars > 1 Then
+                    For col = 0 To 2
+                        Dim Mstart = A1(row - pars, col)
+                        Dim Mend = A1(row - 1, col)
+                        With .Cells.GetSubrange($"{Mstart}:{Mend}")
+                            .Merged = True
+                            .Style = VertCenteredStyle
+                        End With
+                    Next
+                End If
+                If pars = 0 Then row += 1   ' prevent unnecessary blank row
+            Next
 
-        ' Autofit column widths
-        Dim columnCount = worksheet.CalculateMaxUsedColumns()
-        For i As Integer = 0 To columnCount - 1
-            worksheet.Columns(i).AutoFit(1, worksheet.Rows(1), worksheet.Rows(worksheet.Rows.Count - 1))
-        Next
+            ' Apply number format to the "Scale" column
+            .Columns("H").Style.NumberFormat = NumberFormatBuilder.Number(5)
 
-        ' Create a new worksheet for enums
-        Dim EnumSheet As ExcelWorksheet = workbook.Worksheets.Add("Enums")
-        EnumSheet.Rows("1").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+            ' Autofit column widths
+            columnCount = .CalculateMaxUsedColumns()
+            For i As Integer = 0 To columnCount - 1
+                .Columns(i).AutoFit()
+            Next
+        End With
 
-        ' Collect custom types (enums) used in command parameters
-        Dim CustomTypes As New List(Of Type)
+        ' Collect enum and structure types used in command parameters
+        Dim EnumTypes As New List(Of Type), StructureTypes As New List(Of Type)
         For Each cmd In Commands
-            For Each p In cmd.Value.Parameters
-                If p.Typ.BaseType.Name = "Enum" Then
-                    If Not CustomTypes.Contains(p.Typ) Then CustomTypes.Add(p.Typ)
+            For Each param In cmd.Value.Parameters
+                Dim paramType = param.Typ
+                If paramType.BaseType.Name = "Enum" Then
+                    ' it's an Enum
+                    If Not EnumTypes.Contains(param.Typ) Then EnumTypes.Add(param.Typ)
+                Else
+                    ' Check if the type is a generic type (e.g., List(Of T))
+                    If paramType.IsGenericType AndAlso paramType.GetGenericTypeDefinition() = GetType(List(Of )) Then
+                        ' Get the underlying type of the generic type
+                        paramType = paramType.GetGenericArguments()(0)
+                    End If
+                    If paramType.IsValueType AndAlso Not paramType.IsPrimitive AndAlso Not paramType.IsEnum Then
+                        ' it's a structure
+                        If Not StructureTypes.Contains(paramType) Then StructureTypes.Add(paramType)
+                    End If
                 End If
             Next
         Next
 
-        ' Populate the enums worksheet with custom types
-        EnumSheet.Cells("A1").Value = "Custom types"
-        row = 2
-        For Each ct In CustomTypes
-            Dim enums As New List(Of String)
-            For Each value In [Enum].GetValues(ct)
-                Dim name = value.ToString
-                Dim valu = CInt(value).ToString
-                enums.Add($"{name}={valu}")
-            Next
-            EnumSheet.Rows(row).Cells("A").Value = ct.Name
-            EnumSheet.Rows(row).Cells("B").Value = $"{String.Join(", ", enums)}"
-            row += 1
-        Next
+        ' Create a new worksheet for enums
+        Dim EnumSheet As ExcelWorksheet = workbook.Worksheets.Add("Enums")
+        With EnumSheet
+            ' Apply heading style to the first two rows
+            .Rows("1").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+            .Rows("2").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+            ' Populate the enums worksheet with Enum types
+            .Cells("A1").Value = "Enum types"
 
-        ' Autofit column widths for the enums worksheet
-        columnCount = EnumSheet.CalculateMaxUsedColumns()
-        For i As Integer = 0 To columnCount - 1
-            EnumSheet.Columns(i).AutoFit(1, EnumSheet.Rows(1), EnumSheet.Rows(EnumSheet.Rows.Count - 1))
-        Next
+            row = 1
+            col = 0
+            For Each h In {"Enum", "Comment", "Values"}
+                .Cells(row, col).Value = h
+                col += 1
+            Next
+
+            row = 2
+            For Each ct In EnumTypes
+                Dim enums As New List(Of String)
+                For Each value In [Enum].GetValues(ct)
+                    Dim name = value.ToString
+                    Dim valu = CInt(value).ToString
+                    enums.Add($"{name}={valu}")
+                Next
+                .Rows(row).Cells("A").Value = ct.Name
+                Dim comments As Dictionary(Of String, String) = Utilities.GetEnumComments(ct)
+                .Rows(row).Cells("B").Value = $"{String.Join(vbCrLf, comments.ToArray)}"
+                .Rows(row).Cells("C").Value = $"{String.Join(", ", enums)}"
+                row += 1
+            Next
+            For i = 2 To row
+                .Rows(i).Style = VertCenteredStyle
+            Next
+
+            ' Autofit column widths for the enums worksheet
+            columnCount = .CalculateMaxUsedColumns()
+            For i As Integer = 0 To columnCount - 1
+                .Columns(i).AutoFit()
+            Next
+        End With
+
+        ' Create a new worksheet for Structures
+        Dim StructureSheet As ExcelWorksheet = workbook.Worksheets.Add("Structures")
+        With StructureSheet
+            .Rows("1").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+            .Rows("2").Style = workbook.Styles(BuiltInCellStyleName.Heading1)
+            ' Populate the Structures worksheet with Structure types
+            .Cells("A1").Value = "Structure types"
+            row = 1
+            col = 0
+            For Each h In {"Structure", "Comment"}
+                .Cells(row, col).Value = h
+                col += 1
+            Next
+            row = 2
+            For Each ct In StructureTypes
+                Dim name = ct.Name
+                Dim comments As Dictionary(Of String, String) = GetStructureComments(ct)
+                .Rows(row).Cells("A").Value = ct.Name
+                .Rows(row).Cells("B").Value = $"{String.Join(vbCrLf, comments)}"
+                row += 1
+            Next
+            For i = 2 To row
+                .Rows(i).Style = VertCenteredStyle
+            Next
+            ' Autofit column widths for the structures worksheet
+            columnCount = .CalculateMaxUsedColumns()
+            For i As Integer = 0 To columnCount - 1
+                .Columns(i).AutoFit()
+            Next
+        End With
 
         ' Save the workbook to a file
+        With workbook.DocumentProperties
+            .BuiltIn(BuiltInDocumentProperties.Title) = "Leetro MOL Command Reference"
+            .BuiltIn(BuiltInDocumentProperties.Author) = "Marc Hillman. myhillman@gmail.com"
+            .BuiltIn(BuiltInDocumentProperties.Subject) = "Leetro MOL Command Reference"
+            .BuiltIn(BuiltInDocumentProperties.Keywords) = "Leetro, MOL, Command, Reference"
+            .BuiltIn(BuiltInDocumentProperties.Category) = "Leetro MOL Command Reference"
+            .BuiltIn(BuiltInDocumentProperties.Comments) = "This document contains a list of MOL commands and their parameters."
+            .BuiltIn(BuiltInDocumentProperties.DateLastSaved) = Date.UtcNow
+        End With
         workbook.Save("commands.ods")
         TextBox1.AppendText($"Done{vbCrLf}")
     End Sub

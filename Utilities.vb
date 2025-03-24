@@ -1,7 +1,10 @@
-﻿Imports System.Reflection.Metadata
+﻿Imports System.IO
+Imports System.Reflection
+Imports System.Reflection.Metadata
 Imports System.Runtime.InteropServices
 Imports netDxf
 Imports netDxf.Entities
+Imports System.Xml.Linq
 
 ' Miscellaneous SHARED routines that don't belong in a class
 Friend Module Utilities
@@ -200,5 +203,84 @@ Friend Module Utilities
             Throw New ArgumentException("T must be an enumerated type")
         End If
         Return [Enum].IsDefined(GetType(T), value)
+    End Function
+    Public Function GetEnumComments(ByVal enumType As Type) As Dictionary(Of String, String)
+        Dim comments As New Dictionary(Of String, String)
+
+        ' Load the XML documentation file
+        Dim assemblyLocation As String = Assembly.GetExecutingAssembly().Location
+        Dim xmlPath As String = Path.ChangeExtension(assemblyLocation, ".xml")
+        If Not File.Exists(xmlPath) Then
+            Throw New FileNotFoundException("XML documentation file not found.")
+        End If
+
+        Dim xmlDoc As XDocument = XDocument.Load(xmlPath)
+
+        ' Get the comments for the enum type
+        Dim enumComment = xmlDoc.Descendants("member").
+        Where(Function(m) m.Attribute("name").Value = $"T:{enumType.FullName}").
+        Select(Function(m) m.Element("summary").Value.Trim()).
+        FirstOrDefault()
+
+        If enumComment IsNot Nothing Then
+            comments.Add(enumType.Name, enumComment)
+        End If
+
+        ' Get the comments for the enum members
+        For Each member In enumType.GetFields(BindingFlags.Public Or BindingFlags.Static)
+            Dim memberComment = xmlDoc.Descendants("member").
+            Where(Function(m) m.Attribute("name").Value = $"F:{enumType.FullName}.{member.Name}").
+            Select(Function(m) m.Element("summary").Value.Trim()).
+            FirstOrDefault()
+
+            If memberComment IsNot Nothing Then
+                comments.Add(member.Name, memberComment)
+            End If
+        Next
+
+        Return comments
+    End Function
+
+    Public Function GetStructureComments(ByVal structType As Type) As Dictionary(Of String, String)
+        Dim comments As New Dictionary(Of String, String)
+
+        Try
+            ' Load the XML documentation file
+            Dim assemblyLocation As String = Assembly.GetExecutingAssembly().Location
+            Dim xmlPath As String = Path.ChangeExtension(assemblyLocation, ".xml")
+            If Not File.Exists(xmlPath) Then
+                Throw New FileNotFoundException("XML documentation file not found.")
+            End If
+
+            Dim xmlDoc As XDocument = XDocument.Load(xmlPath)
+
+            ' Get the comments for the structure type
+            Dim structComment = xmlDoc.Descendants("member").
+                Where(Function(m) m.Attribute("name").Value = $"T:{structType.FullName}").
+                Select(Function(m) m.Element("summary").Value.Trim()).
+                FirstOrDefault()
+
+            If structComment IsNot Nothing Then
+                comments.Add(structType.Name, structComment)
+            End If
+
+            ' Get the comments for the structure members
+            For Each member In structType.GetFields(BindingFlags.Public Or BindingFlags.Instance)
+                Dim memberComment = xmlDoc.Descendants("member").
+                    Where(Function(m) m.Attribute("name").Value = $"F:{structType.FullName}.{member.Name}").
+                    Select(Function(m) m.Element("summary").Value.Trim()).
+                    FirstOrDefault()
+
+                If memberComment IsNot Nothing Then
+                    comments.Add(member.Name, memberComment)
+                End If
+            Next
+
+        Catch ex As Exception
+            ' Log the exception message
+            Console.WriteLine($"Error: {ex.Message}")
+        End Try
+
+        Return comments
     End Function
 End Module
