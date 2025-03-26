@@ -499,6 +499,7 @@ Public Class Form1
     End Class
     ' Definitions of full (param count + command) MOL file commands
     Private Const MOL_MVREL = &H3026000
+    Private Const MOL_MVREL1 = &H3022040
     Private Const MOL_START = &H3026040
     Private Const MOL_ORIGIN = &H346040
     Private Const MOTION_CMD_COUNT = &H3090080
@@ -549,6 +550,12 @@ Public Class Form1
     ''' </remarks>
     Private Commands As New SortedDictionary(Of Integer, MOLcmd) From {
         {MOL_MVREL, New MOLcmd("MVREL", "Move the cutter by dx,dy", ParameterCount.FIXED, New List(Of Parameter) From {
+                            {New Parameter("n", "Equivalent to 0x0304, i.e. both x and y", GetType(Int32))},
+                            {New Parameter("dx", "delta to move in X direction", GetType(Int32), 1 / xScale, "mm")},
+                            {New Parameter("dy", "delta to move in Y direction", GetType(Int32), 1 / yScale, "mm")}
+                            }
+                           )},
+        {MOL_MVREL1, New MOLcmd("MVREL1", "Move the cutter by dx,dy", ParameterCount.FIXED, New List(Of Parameter) From {
                             {New Parameter("n", "Equivalent to 0x0304, i.e. both x and y", GetType(Int32))},
                             {New Parameter("dx", "delta to move in X direction", GetType(Int32), 1 / xScale, "mm")},
                             {New Parameter("dy", "delta to move in Y direction", GetType(Int32), 1 / yScale, "mm")}
@@ -1078,7 +1085,7 @@ Public Class Form1
             Case MOL_SCALE      ' also MOL_SPDPWR, MOL_SPDPWRx
                 xScale = GetFloat() : yScale = GetFloat() : zScale = GetFloat()        ' x,y,z scale command
 
-            Case MOL_MVREL, MOL_START
+            Case MOL_MVREL, MOL_MVREL1, MOL_START
                 Dim n = GetUInt()           ' always 772
                 If n <> 772 Then Throw New Exception($"MOL_MVREL: n is not 772 @0x{addr:x}")
                 Dim delta = New IntPoint(GetInt(), GetInt())      ' move relative command
@@ -1188,7 +1195,8 @@ Public Class Form1
                         If StartPosns(n).Absolute Then position = StartPosns(n).position Else position += StartPosns(n).position
                         TextBox1.AppendText($"Starting subr {n} with position ({position.X},{position.Y}){vbCrLf}")
                     Else
-                        Throw New SystemException($"GOSUB {n} has no start position")
+                        StartPosns.Add(n, (True, ZERO))
+                        'Throw New SystemException($"Subroutine {n} has no start position @0x{addr:x8}")
                     End If
                 End If
                 Select Case block
@@ -1644,7 +1652,7 @@ Public Class Form1
         End If
 
         Select Case command
-            Case MOL_MVREL, MOL_UNKNOWN07, MOL_UNKNOWN09        ' Count the number of MOL_MVREL, MOL_UNKNOWN07 & MOL_UNKNOWN09 commands
+            Case MOL_MVREL, MOL_MVREL1, MOL_UNKNOWN07, MOL_UNKNOWN09        ' Count the number of MOL_MVREL, MOL_UNKNOWN07 & MOL_UNKNOWN09 commands
                 MVRELCnt += 1
             Case MOL_LASER, MOL_LASER1, MOL_LASER2  ' track mode of laser
                 If Parameters(0) Is Nothing Then Throw New Exception($"{value.Mnemonic}: Laser mode not set")
@@ -2263,12 +2271,14 @@ Public Class Form1
             TextFile.WriteLine()
             TextFile.WriteLine("Command frequency")
             TextFile.WriteLine()
+            Dim CommandCount = 0
             For Each cmd In CommandUsage
                 Dim value As MOLcmd = Nothing, decode As String
                 If Commands.TryGetValue(cmd.Key, value) Then decode = value.Mnemonic Else decode = $"0x{cmd.Key:x8}"
+                CommandCount += cmd.Value
                 TextFile.WriteLine($"{decode}  {cmd.Value}")
             Next
-
+            TextFile.WriteLine($"Distinct commands={CommandUsage.Count}, Total commands = {CommandCount}")
             ' Other metrics
 
             TextFile.Close()
@@ -2856,14 +2866,14 @@ Public Class Form1
                     .Rows(row).Cells("E").Value = p.Description
                     .Rows(row).Cells("F").Value = p.Name
                     Dim typ = p.Typ.ToString
-                    If typ.StartsWith("MOL.") Then typ = typ.Substring(4)    ' remove MOL qualifier
-                    Select Case typ
-                        Case "System.Int32" : typ = "Int32"
-                    End Select
                     ' Look for Generic.List types, and extract base type
                     Dim matches = Regex.Match(typ, "^System.Collections.Generic.List`1\[MOL.(.*)\]$")
                     If matches.Success Then
                         typ = $"List(Of {matches.Groups(1)})"
+                    ElseIf typ.StartsWith("MOL.") Then
+                        typ = typ.Substring(4)    ' remove MOL qualifier
+                    ElseIf typ.StartsWith("System.") Then
+                        typ = typ.Substring(7)    ' remove System qualifier
                     End If
                     .Rows(row).Cells("G").Value = typ
                     .Rows(row).Cells("H").Value = p.Scale
@@ -2903,7 +2913,8 @@ Public Class Form1
         For Each cmd In Commands
             For Each param In cmd.Value.Parameters
                 Dim paramType = param.Typ
-                If paramType.BaseType.Name = "Enum" Then
+                'If paramType.BaseType.Name = "Enum" Then
+                If paramType.IsEnum Then
                     ' it's an Enum
                     If Not EnumTypes.Contains(param.Typ) Then EnumTypes.Add(param.Typ)
                 Else
@@ -2912,7 +2923,7 @@ Public Class Form1
                         ' Get the underlying type of the generic type
                         paramType = paramType.GetGenericArguments()(0)
                     End If
-                    If paramType.IsValueType AndAlso Not paramType.IsPrimitive AndAlso Not paramType.IsEnum Then
+                    If paramType.IsValueType AndAlso Not paramType.IsPrimitive Then
                         ' it's a structure
                         If Not StructureTypes.Contains(paramType) Then StructureTypes.Add(paramType)
                     End If
@@ -3060,9 +3071,11 @@ Public Class Form1
     Private Sub FindCommandToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles FindCommandToolStripMenuItem.Click
         ' Search all .MOL files for specific command
         ' display location and parameters
-        Dim cmd_len As Integer, target As Integer, count As Integer = 0, Mnemonic As String = "", chunks As List(Of Integer)
+        Dim command As String, cmd As Integer, cmd_len As Integer, target As Integer, count As Integer = 0, Mnemonic As String = "", chunks As List(Of Integer)
+        Dim addr As Integer
+        Dim MotionBlockCommands() = {MOL_MCBLK, &H1000241, MOL_ENGLSR, MOL_ENGMVX, MOL_ENGMVY}    ' commands counted for "Motion Blocks" field of header
 
-        Dim command As String = InputBox("Input command name or hex value", "Find command in all .MOL files")
+        command = InputBox("Input command name or hex value", "Find command in all .MOL files")
         command = UCase(command)
         If command.StartsWith("0X") Then command = command.Remove(0, 2)         ' remove hex prefix
         ' First check if it's a mnemonic
@@ -3093,30 +3106,35 @@ Public Class Form1
             ' Make list of chunks to be scanned
             chunks = New List(Of Integer) From {ConfigChunk, TestChunk, CutChunk}
             chunks.AddRange(DrawChunks)
-
+            Dim MotionBlocksCount As Integer = 0
             For Each chunk In chunks        ' look in all chunks
                 reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
-                Dim addr = reader.BaseStream.Position
-                Dim cmd = GetInt()
+                addr = reader.BaseStream.Position
+                cmd = GetInt()
                 While cmd <> MOL_END
+                    If MotionBlockCommands.Contains(cmd) Then MotionBlocksCount += 1     ' count motion commands
                     cmd_len = cmd >> 24 And &HFF    ' length of command
                     If cmd_len = &H80 Then
                         cmd_len = GetInt() And &H1FF    ' length of command
                     End If
-                    If cmd = target Then
-                        TextBox1.AppendText($"Found at 0x{addr:x}: {GetBlockType(addr)} ({cmd_len}) ")
-                        For i = 1 To cmd_len : TextBox1.AppendText($" 0x{GetUInt():x8}") : Next
-                        TextBox1.AppendText(vbCrLf)
-                        count += 1
-                    Else
-                        If cmd = MOL_MCBLK Then cmd_len = 1             ' process contents of MCBLK
-                        For i = 1 To cmd_len : GetInt() : Next ' consume command
-                    End If
+                    Select Case cmd
+                        Case MOL_MCBLK
+                            ' length parameter already consumed
+                            MCBLKCount += 1
+                        Case target
+                            TextBox1.AppendText($"Found at 0x{addr:x}: {GetBlockType(addr)} ({cmd_len}) ")
+                            For i = 1 To cmd_len : TextBox1.AppendText($" 0x{GetUInt():x8}") : Next
+                            TextBox1.AppendText(vbCrLf)
+                            count += 1
+                        Case Else
+                            For i = 1 To cmd_len : GetInt() : Next ' consume command
+                    End Select
                     addr = reader.BaseStream.Position
                     cmd = GetInt()
                 End While
             Next
             reader.Close()
+            TextBox1.AppendText($"Motion blocks (header) = {MotionBlocks}, Motion blocks count={MotionBlocksCount}{vbCrLf}")
         Next
         TextBox1.AppendText($"Done. {molFiles.Length} files processed, {count} instances of command found{vbCrLf}")
     End Sub

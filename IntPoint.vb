@@ -22,7 +22,7 @@ Public Class IntPoint
     ''' <value>The length of the vector.</value>
     Public ReadOnly Property Length As Double
         Get
-            Return Math.Sqrt(X * X + Y * Y)
+            Return Math.Sqrt(CLng(X) * CLng(X) + CLng(Y) * CLng(Y))
         End Get
     End Property
 

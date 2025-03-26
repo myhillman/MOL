@@ -1,10 +1,8 @@
 ﻿Imports System.IO
 Imports System.Reflection
-Imports System.Reflection.Metadata
 Imports System.Runtime.InteropServices
 Imports netDxf
 Imports netDxf.Entities
-Imports System.Xml.Linq
 
 ' Miscellaneous SHARED routines that don't belong in a class
 Friend Module Utilities
@@ -234,7 +232,7 @@ Friend Module Utilities
             FirstOrDefault()
 
             If memberComment IsNot Nothing Then
-                comments.Add(member.Name, memberComment)
+                comments.Add($"{member.Name}={CInt(member.GetValue(Nothing))}", memberComment)
             End If
         Next
 
