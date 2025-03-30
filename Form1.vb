@@ -772,7 +772,7 @@ Public Class Form1
     Public Sub PutInt(n As Integer, addr As Integer)
         ' write n at specifed offset
         If UseMCBLK Then
-            Throw New System.Exception($"You can't write explicitly to address {addr:x} as an MCBLK in in operation")
+            Throw New Exception($"You can't write explicitly to address {addr:x} as an MCBLK in in operation")
         Else
             writer.BaseStream.Seek(addr, SeekOrigin.Begin)     ' go to offset
             writer.Write(n)                     ' write data
@@ -786,7 +786,7 @@ Public Class Form1
 
         ' Check if the reader stream is open and can be read
         If Not reader.BaseStream.CanRead Then
-            Throw New System.Exception("reader is not open")
+            Throw New Exception("reader is not open")
         End If
 
         ' Set the stream position to the start of the file
@@ -977,7 +977,7 @@ Public Class Form1
                             Exit For ' all parameters have been consumed
 
                         Case Else
-                            Throw New System.Exception($"{value.Mnemonic}: Unrecognised parameter type of {p.Typ}")
+                            Throw New Exception($"{value.Mnemonic}: Unrecognised parameter type of {p.Typ}")
                     End Select
                 Next
             Else
@@ -1119,7 +1119,7 @@ Public Class Form1
                             DXF_line(position, position + delta, MoveLayer)
                         End If
                     Case Else
-                        Throw New System.Exception($"Unexpected block type: {block}")
+                        Throw New Exception($"Unexpected block type: {block}")
                 End Select
                 If LaserMode <> LSRMode_Enum.Off Then MaxLength = Math.Max(delta.Length, MaxLength)
                 If block <> BLOCKTYPE.CONFIG Then position += delta       ' update head position
@@ -1241,7 +1241,7 @@ Public Class Form1
                     reader.BaseStream.Seek(popped.item1, SeekOrigin.Begin)     ' return to the saved return address
                     Return reader.BaseStream.Position
                 Else
-                    Throw New System.Exception($"Stack is exhausted - no return address for ENDSUB {n}")
+                    Throw New Exception($"Stack is exhausted - no return address for ENDSUB {n}")
                 End If
 
             Case MOL_GOSUBn, MOL_GOSUBb       ' Call subroutine with parameters
@@ -1286,7 +1286,7 @@ Public Class Form1
             Case DrawChunks(0) * BLOCK_SIZE To FileSize
                 Return BLOCKTYPE.DRAW
             Case Else
-                Throw New System.Exception($"Unknown block type at address {addr:x8}")
+                Throw New Exception($"Unknown block type at address {addr:x8}")
         End Select
     End Function
     ' DXF_line sub with Vector2 parameters
@@ -1595,13 +1595,13 @@ Public Class Form1
     ''' <param name="command">The MOL command to write.</param>
     ''' <param name="Parameters">Optional parameters for the command.</param>
     ''' <param name="posn">Optional position to write the command to. If not specified, writes at the current position.</param>
-    ''' <exception cref="System.Exception">Thrown if there is a parameter mismatch or unsupported parameter type.</exception>
+    ''' <exception cref="Exception">Thrown if there is a parameter mismatch or unsupported parameter type.</exception>
     Public Sub WriteMOL(command As Integer, Optional ByVal Parameters() As Object = Nothing, Optional posn As Integer = -1)
         ' Write a MOL command, with parameters to MOL file
         ' Parameters are written in scaled values
         ' Parameters will be written (but not length) if present
         ' writing occurs at current writer position, or "posn" if present
-        If UseMCBLK And posn <> -1 Then Throw New System.Exception($"You can't write explicitly to address {posn:x} as an MCBLK in in operation")
+        If UseMCBLK And posn <> -1 Then Throw New Exception($"You can't write explicitly to address {posn:x} as an MCBLK in in operation")
 
         Dim value As MOLcmd = Nothing        ' Check the correct number of parameters
         If Commands.TryGetValue(command, value) Then
@@ -1609,11 +1609,11 @@ Public Class Form1
             Dim nWords = value.Parameters.Count
             If Parameters Is Nothing Then
                 If nWords <> 0 Then
-                    Throw New System.Exception($"WRITEMOL {value.Mnemonic}: parameter error. Parameter is Nothing, yet command requires {nWords}")
+                    Throw New Exception($"WRITEMOL {value.Mnemonic}: parameter error. Parameter is Nothing, yet command requires {nWords}")
                 End If
             Else
                 If value.ParameterType = ParameterCount.FIXED And Parameters.Length <> nWords Then
-                    Throw New System.Exception($"{value.Mnemonic}: parameter error. There are {Parameters.Length} parameters, yet command requires {nWords}")
+                    Throw New Exception($"{value.Mnemonic}: parameter error. There are {Parameters.Length} parameters, yet command requires {nWords}")
                 End If
             End If
 
@@ -1623,7 +1623,7 @@ Public Class Form1
                     Dim a = value.Parameters(i).Typ
                     Dim b = Parameters(i).GetType
                     If a <> b Then
-                        Throw New System.Exception($"{value.Mnemonic}: parameter {value.Parameters(i).Name}: type mismatch - spec is {a}, call is {b}")
+                        Throw New Exception($"{value.Mnemonic}: parameter {value.Parameters(i).Name}: type mismatch - spec is {a}, call is {b}")
                     End If
                 Next
             End If
@@ -1646,7 +1646,7 @@ Public Class Form1
                     Case GetType(Acceleration_Enum), GetType(LSRMode_Enum), GetType(Axis_Enum)
                         PutInt(p)
                     Case Else
-                        Throw New System.Exception($"WRITEMOL: Parameter of unsupported type {p.GetType}")
+                        Throw New Exception($"WRITEMOL: Parameter of unsupported type {p.GetType}")
                 End Select
             Next
         End If
@@ -1762,7 +1762,7 @@ Public Class Form1
         '    dytotal += Move.dy
         'Next
         'If dxtotal <> delta.X Or dytotal <> delta.Y Then
-        '    Throw New System.Exception($"CutLine: Calculated distance {dxtotal},{dytotal} does not match requested {delta.X},{delta.Y}")
+        '    Throw New Exception($"CutLine: Calculated distance {dxtotal},{dytotal} does not match requested {delta.X},{delta.Y}")
         'End If
 
         ' Execute the moves
@@ -2332,7 +2332,7 @@ Public Class Form1
             For Each block In blocks
                 Dim addr = block * BLOCK_SIZE
                 Dim n = GetInt(addr)
-                If n <> MOL_BEGSUB And n <> MOL_BEGSUBa Then Throw New System.Exception($"Block {block} @ 0x{addr:x} does not start with a BEGSUB or BEGSUBa command")
+                If n <> MOL_BEGSUB And n <> MOL_BEGSUBa Then Throw New Exception($"Block {block} @ 0x{addr:x} does not start with a BEGSUB or BEGSUBa command")
                 n = GetInt()    ' the subroutine number
                 SubrAddrs.Add(n, addr)
             Next
@@ -2656,7 +2656,7 @@ Public Class Form1
             Case System.Windows.TextAlignment.Right
                 offset = -(baseline - LetterSpacing)               ' shift origin to right of string
             Case Else
-                Throw New System.Exception($"Unrecognised alignment value: {alignment}")
+                Throw New Exception($"Unrecognised alignment value: {alignment}")
         End Select
 
         ' Polylines are based at (0,0)
@@ -2778,7 +2778,7 @@ Public Class Form1
                                                 stroke.Vertexes.Add(v)      ' add arc to polyline
                                             Next
                                         Case Else
-                                            Throw New System.Exception($"Illegal number of coordinates ({Coords.Length} on line {LineNumber}: {line}")
+                                            Throw New Exception($"Illegal number of coordinates ({Coords.Length} on line {LineNumber}: {line}")
                                     End Select
                                 Next
                                 Strokes.Add(stroke)
@@ -3011,7 +3011,7 @@ Public Class Form1
             .BuiltIn(BuiltInDocumentProperties.Keywords) = "Leetro, MOL, Command, Reference"
             .BuiltIn(BuiltInDocumentProperties.Category) = "Leetro MOL Command Reference"
             .BuiltIn(BuiltInDocumentProperties.Comments) = "This document contains a list of MOL commands and their parameters."
-            .BuiltIn(BuiltInDocumentProperties.DateLastSaved) = Date.UtcNow
+            .BuiltIn(BuiltInDocumentProperties.DateLastSaved) = Date.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
         End With
         workbook.Save("commands.ods")
         TextBox1.AppendText($"Done{vbCrLf}")
