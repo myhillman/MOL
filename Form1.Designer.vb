@@ -31,6 +31,7 @@ Partial Class Form1
         DXFMetricsToolStripMenuItem = New ToolStripMenuItem()
         ReconstructMINIMARIOMOLToolStripMenuItem = New ToolStripMenuItem()
         CommandSpreadsheetToolStripMenuItem = New ToolStripMenuItem()
+        FindCommandToolStripMenuItem = New ToolStripMenuItem()
         ExitToolStripMenuItem = New ToolStripMenuItem()
         DebugToolStripMenuItem = New ToolStripMenuItem()
         HEXDUMPONToolStripMenuItem = New ToolStripMenuItem()
@@ -48,7 +49,7 @@ Partial Class Form1
         TestCutlineToolStripMenuItem = New ToolStripMenuItem()
         TextBox1 = New TextBox()
         ProgressBar1 = New ProgressBar()
-        FindCommandToolStripMenuItem = New ToolStripMenuItem()
+        CorrelationToolStripMenuItem = New ToolStripMenuItem()
         MenuStrip1.SuspendLayout()
         SuspendLayout()
         ' 
@@ -110,6 +111,12 @@ Partial Class Form1
         CommandSpreadsheetToolStripMenuItem.Size = New Size(233, 22)
         CommandSpreadsheetToolStripMenuItem.Text = "Command Spreadsheet"
         ' 
+        ' FindCommandToolStripMenuItem
+        ' 
+        FindCommandToolStripMenuItem.Name = "FindCommandToolStripMenuItem"
+        FindCommandToolStripMenuItem.Size = New Size(233, 22)
+        FindCommandToolStripMenuItem.Text = "Find Command"
+        ' 
         ' ExitToolStripMenuItem
         ' 
         ExitToolStripMenuItem.Name = "ExitToolStripMenuItem"
@@ -149,7 +156,7 @@ Partial Class Form1
         ' 
         ' TestToolStripMenuItem
         ' 
-        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, FontTestToolStripMenuItem, TestCutlineToolStripMenuItem})
+        TestToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {WordAccessToolStripMenuItem, TestIEEEToLeetroFpConversionToolStripMenuItem, TextTestToolStripMenuItem, LineTestToolStripMenuItem, BoxTestToolStripMenuItem, ConvertLeetroToIEEEToolStripMenuItem, FontTestToolStripMenuItem, TestCutlineToolStripMenuItem, CorrelationToolStripMenuItem})
         TestToolStripMenuItem.Name = "TestToolStripMenuItem"
         TestToolStripMenuItem.Size = New Size(40, 20)
         TestToolStripMenuItem.Text = "Test"
@@ -220,11 +227,11 @@ Partial Class Form1
         ProgressBar1.Size = New Size(1023, 21)
         ProgressBar1.TabIndex = 2
         ' 
-        ' FindCommandToolStripMenuItem
+        ' CorrelationToolStripMenuItem
         ' 
-        FindCommandToolStripMenuItem.Name = "FindCommandToolStripMenuItem"
-        FindCommandToolStripMenuItem.Size = New Size(233, 22)
-        FindCommandToolStripMenuItem.Text = "Find Command"
+        CorrelationToolStripMenuItem.Name = "CorrelationToolStripMenuItem"
+        CorrelationToolStripMenuItem.Size = New Size(244, 22)
+        CorrelationToolStripMenuItem.Text = "Correlation"
         ' 
         ' Form1
         ' 
@@ -271,5 +278,6 @@ Partial Class Form1
     Friend WithEvents CommandSpreadsheetToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents TestCutlineToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents FindCommandToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents CorrelationToolStripMenuItem As ToolStripMenuItem
 
 End Class

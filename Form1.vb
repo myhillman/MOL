@@ -12,6 +12,8 @@ Imports System.Text
 Imports System.Windows.Ink
 Imports GemBox.Spreadsheet
 Imports SixLabors.ImageSharp.Drawing
+Imports MathNet.Numerics.Statistics
+Imports System.Windows.Input
 
 ' Create a pseudo type to handle Leetro floating point numbers in a more natural way
 ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
@@ -833,15 +835,21 @@ Public Class Form1
 
         GetHeader()         ' get header info
         textfile.WriteLine($"HEADER 0")
-        textfile.WriteLine($"Size of file: 0x{FileSize:x} bytes")
-        textfile.WriteLine($"Motion blocks: {MotionBlocks}")
-        textfile.WriteLine($"Version: {Version}")
-        textfile.WriteLine($"Origin: ({TopRight.X},{TopRight.Y}) ({TopRight.X / xScale:f1},{TopRight.Y / yScale:f1})mm")
-        textfile.WriteLine($"Bottom Left: ({BottomLeft.X},{BottomLeft.Y}) ({BottomLeft.X / xScale:f1},{BottomLeft.Y / yScale:f1})mm")
-        textfile.WriteLine($"Config chunk: {ConfigChunk}")
-        textfile.WriteLine($"Test chunk: {TestChunk}")
-        textfile.WriteLine($"Cut chunk: {CutChunk}")
-        textfile.WriteLine($"Draw chunks: {String.Join(",", DrawChunks.ToArray)}")
+        Dim addr As Integer = 0
+        textfile.WriteLine($"0x{addr:x3}: 0x{FileSize:x} ' Size of file in bytes") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: {MotionBlocks} ' Motion Blocks") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: {Version} ' Version") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: 0x{GetInt(&HC):x8} ' Unknown") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: {GetInt(&H10)} ' Unknown") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: 0x{GetInt(&H14):x8} ' 4 booleans") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: ({TopRight.X},{TopRight.Y}) ' Top Right") : addr += 8
+        textfile.WriteLine($"0x{addr:x3}: ({BottomLeft.X},{BottomLeft.Y}) ' Bottom Left") : addr += 8
+        textfile.WriteLine($"0x{addr:x3}: 0x{GetInt(&H28):x8} ' Unknown") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: 0x{GetInt(&H2C):x8} ' Unknown") : addr = &H70
+        textfile.WriteLine($"0x{addr:x3}: {ConfigChunk} ' Config Chunk") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: {TestChunk} ' Test Chunk") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: {CutChunk} ' Cut Chunk") : addr += 4
+        textfile.WriteLine($"0x{addr:x3}: {String.Join(",", DrawChunks.ToArray)} ' Draw Chunks")
         textfile.WriteLine()
     End Sub
     ''' <summary>
@@ -1258,7 +1266,7 @@ Public Class Form1
                 Dim n As Integer = GetInt()
                 dxfBlock = New Blocks.Block($"Subr {n}")
 
-            Case MOL_ACCELERATION, MOL_SETSPD, MOL_PWRSPD5, MOL_PWRSPD7, MOL_BLWRa, MOL_BLWRb, MOL_X5_FIRST, MOL_MOTION, MOL_ENGSPD1, MOL_ENGPWR1
+            Case MOL_ACCELERATION, MOL_SETSPD, MOL_PWRSPD5, MOL_PWRSPD7, MOL_BLWRa, MOL_BLWRb, MOL_X5_FIRST, MOL_MOTION, MOL_ENGSPD1, MOL_ENGPWR1, MOL_GRDADJ
                 ' Nothing to do
 
             Case Else
@@ -3106,36 +3114,196 @@ Public Class Form1
             ' Make list of chunks to be scanned
             chunks = New List(Of Integer) From {ConfigChunk, TestChunk, CutChunk}
             chunks.AddRange(DrawChunks)
-            Dim MotionBlocksCount As Integer = 0
             For Each chunk In chunks        ' look in all chunks
                 reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
-                addr = reader.BaseStream.Position
-                cmd = GetInt()
-                While cmd <> MOL_END
-                    If MotionBlockCommands.Contains(cmd) Then MotionBlocksCount += 1     ' count motion commands
+                While reader.BaseStream.Position < FileSize
+                    cmd = GetInt()              ' get command
+                    If cmd = MOL_END Then Exit While        ' end of code
                     cmd_len = cmd >> 24 And &HFF    ' length of command
                     If cmd_len = &H80 Then
                         cmd_len = GetInt() And &H1FF    ' length of command
                     End If
                     Select Case cmd
-                        Case MOL_MCBLK
-                            ' length parameter already consumed
-                            MCBLKCount += 1
                         Case target
                             TextBox1.AppendText($"Found at 0x{addr:x}: {GetBlockType(addr)} ({cmd_len}) ")
                             For i = 1 To cmd_len : TextBox1.AppendText($" 0x{GetUInt():x8}") : Next
                             TextBox1.AppendText(vbCrLf)
                             count += 1
+                        Case MOL_MCBLK
+                            ' nothing. Parameter is already consumed
                         Case Else
                             For i = 1 To cmd_len : GetInt() : Next ' consume command
                     End Select
-                    addr = reader.BaseStream.Position
-                    cmd = GetInt()
                 End While
             Next
             reader.Close()
-            TextBox1.AppendText($"Motion blocks (header) = {MotionBlocks}, Motion blocks count={MotionBlocksCount}{vbCrLf}")
         Next
         TextBox1.AppendText($"Done. {molFiles.Length} files processed, {count} instances of command found{vbCrLf}")
     End Sub
+
+    ''' <summary>
+    ''' Handles the click event for the "Correlation" menu item.
+    ''' This method performs a correlation analysis between the frequency of commands in all .MOL files
+    ''' and the "Motion Blocks" metric, and displays the results.
+    ''' </summary>
+    ''' <param name="sender">The source of the event.</param>
+    ''' <param name="e">The event data.</param>
+    Private Sub CorrelationToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CorrelationToolStripMenuItem.Click
+        ' Get frequency of commands in all .MOL files
+        Dim command As String, cmd As Integer, cmd_len As Integer, count As Integer = 0, Mnemonic As String = "", chunks As List(Of Integer)
+        Dim addr As Integer, fi As String = ""
+
+        Dim workingDirectory = Environment.CurrentDirectory
+        Dim projectDirectory = Directory.GetParent(workingDirectory).Parent.Parent.FullName
+        Dim molFiles As String() = Directory.GetFiles(projectDirectory, "*.mol", SearchOption.AllDirectories)
+        Dim commandFrequency As New Dictionary(Of Integer, Integer)
+
+        ' Get list of all unique commands in all files
+        Try
+            For Each fi In molFiles
+                Dim stream = System.IO.File.Open(fi, FileMode.Open)
+                reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
+                GetHeader()
+                ' Make list of chunks to be scanned
+                chunks = New List(Of Integer) From {ConfigChunk, TestChunk, CutChunk}
+                chunks.AddRange(DrawChunks)
+                For Each chunk In chunks        ' look in all chunks
+                    reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
+                    While reader.BaseStream.Position < FileSize
+                        cmd = GetInt()              ' get command
+                        If cmd = MOL_END Then Exit While        ' end of code
+                        commandFrequency.TryAdd(cmd, 0)       ' add command to dictionary if not already there
+                        cmd_len = cmd >> 24 And &HFF    ' length of command
+                        If cmd_len = &H80 Then
+                            cmd_len = GetInt() And &H1FF    ' length of command
+                        End If
+                        If cmd <> MOL_MCBLK Then For i = 1 To cmd_len : GetInt() : Next ' consume command
+                    End While
+                Next
+                reader.Close()
+            Next
+        Catch ex As Exception
+            Throw New Exception($"{ex.Message}{vbCrLf}File: {fi} Addr 0x{addr:x8}")
+        End Try
+        TextBox1.AppendText($"Unique commands found: {commandFrequency.Count}{vbCrLf}")
+
+        ' Now count the frequency of each command
+        Using csvfile = My.Computer.FileSystem.OpenTextFileWriter("CommandFrequency.csv", False)
+            Dim comds As List(Of String) = commandFrequency.Keys.Select(Function(x) $"0x{x:x8}").ToList
+            csvfile.WriteLine("File,Motion Blocks," & String.Join(",", comds))
+            For Each fi In molFiles
+                Using stream = System.IO.File.Open(fi, FileMode.Open)
+                    reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
+                    For Each c In commandFrequency.Keys
+                        commandFrequency(c) = 0         ' init count
+                    Next
+                    GetHeader()
+                    ' Make list of chunks to be scanned
+                    chunks = New List(Of Integer) From {ConfigChunk, TestChunk, CutChunk}
+                    chunks.AddRange(DrawChunks)
+                    For Each chunk In chunks        ' look in all chunks
+                        reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
+                        While reader.BaseStream.Position < FileSize
+                            cmd = GetInt()              ' get command
+                            If cmd = MOL_END Then Exit While        ' end of code
+                            commandFrequency(cmd) += 1       ' count command
+                            cmd_len = cmd >> 24 And &HFF    ' length of command
+                            If cmd_len = &H80 Then
+                                cmd_len = GetInt() And &H1FF    ' length of command
+                            End If
+                            If cmd <> MOL_MCBLK Then For i = 1 To cmd_len : GetInt() : Next ' consume command
+                        End While
+                    Next
+                End Using
+                ' Save metrics
+                csvfile.WriteLine($"{fi},{MotionBlocks},{String.Join(",", commandFrequency.Values.ToArray)}")
+            Next
+        End Using
+
+        ' Perform correlation
+        Dim inputPath As String = "CommandFrequency.csv"
+        Dim data As List(Of String()) = File.ReadAllLines(inputPath).Select(Function(line) line.Split(","c)).ToList()
+        Dim headers As String() = data(0)
+        data.RemoveAt(0)
+
+        Dim metrics As List(Of Double) = data.Select(Function(row) Double.Parse(row(1))).ToList()
+        Dim commandFrequencies As New Dictionary(Of String, List(Of Double))
+
+        For i As Integer = 2 To headers.Length - 1
+            Dim x As Integer = i
+            commandFrequencies(headers(i)) = data.Select(Function(row) Double.Parse(row(x))).ToList()
+        Next
+
+        Dim correlations As New Dictionary(Of String, Double)
+
+        For Each command In commandFrequencies.Keys
+            Dim correlation As Double = MathNet.Numerics.Statistics.Correlation.Pearson(metrics, commandFrequencies(command))
+            correlations(command) = correlation
+        Next
+
+        ' Print correlations
+        TextBox1.AppendText("Correlations:" & vbCrLf)
+        correlations = correlations.OrderByDescending(Function(x) x.Value).ToDictionary(Function(x) x.Key, Function(x) x.Value)
+        For Each kvp In correlations
+            Dim key As String = kvp.Key
+            If key.StartsWith("0x") Then key = key.Remove(0, 2)         ' remove hex prefix
+            key = Convert.ToInt32(key, 16)
+            key = FindMnemonicByKey(CInt(key))
+            TextBox1.AppendText($"{key}: {kvp.Value:f2}{vbCrLf}")
+        Next
+
+        ' Now check correlation with commands > 0.65 correlation
+        Dim highCorrelations As New List(Of Integer)
+        For Each kvp In correlations
+            If kvp.Value >= 0.3 Then
+                Dim Key As String = Trim(kvp.Key)
+                If Key.StartsWith("0x") Then Key = Key.Remove(0, 2)         ' remove hex prefix
+                Key = Convert.ToInt32(Key, 16)
+                highCorrelations.Add(Key)
+            End If
+        Next
+
+        Dim highcorrelationsbyMnemonic = highCorrelations.Select(Function(x) FindMnemonicByKey(x)).ToList()
+        TextBox1.AppendText($"High correlations: {String.Join(", ", highcorrelationsbyMnemonic.ToArray)}{vbCrLf}")
+        ' Scan all files using highcorrelation list
+        For Each fi In molFiles
+            Dim stream = System.IO.File.Open(fi, FileMode.Open)
+            reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
+            count = 0
+            GetHeader()
+            ' Make list of chunks to be scanned
+            chunks = New List(Of Integer) From {ConfigChunk, TestChunk, CutChunk}
+            chunks.AddRange(DrawChunks)
+            For Each chunk In chunks        ' look in all chunks
+                reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
+                While reader.BaseStream.Position < FileSize
+                    cmd = GetInt()              ' get command
+                    If cmd = MOL_END Then Exit While        ' end of code
+                    If highCorrelations.Contains(cmd) Then count += 1     ' count motion commands
+                    cmd_len = cmd >> 24 And &HFF    ' length of command
+                    If cmd_len = &H80 Then
+                        cmd_len = GetInt() And &H1FF    ' length of command
+                    End If
+                    If cmd <> MOL_MCBLK Then For i = 1 To cmd_len : GetInt() : Next ' consume command
+                End While
+            Next
+            reader.Close()
+            TextBox1.AppendText($"{fi} Motion blocks (header) = {MotionBlocks}, calculated ={count}{vbCrLf}")
+        Next
+    End Sub
+
+
+    ''' <summary>
+    ''' Finds the mnemonic for a given key value. Returns hex value if unknown
+    ''' </summary>
+    ''' <param name="key">The key value to look up.</param>
+    ''' <returns>The mnemonic for the given key value, or "Unknown" if the key is not found.</returns>
+    Public Function FindMnemonicByKey(key As Integer) As String
+        Dim value As MOLcmd = Nothing
+        If Commands.TryGetValue(key, value) Then
+            Return value.Mnemonic
+        Else
+            Return $"0x{key:x8}"
+        End If
+    End Function
 End Class

@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <PackageReference Include="GemBox.Spreadsheet" Version="2025.3.112" />
+    <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
     <PackageReference Include="netDxf" Version="2023.11.10" />
   </ItemGroup>
 
