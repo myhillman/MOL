@@ -14,6 +14,7 @@ Imports GemBox.Spreadsheet
 Imports SixLabors.ImageSharp.Drawing
 Imports MathNet.Numerics.Statistics
 Imports System.Windows.Input
+Imports System.Net
 
 ' Create a pseudo type to handle Leetro floating point numbers in a more natural way
 ' Leetro float format  [eeeeeeee|smmmmmmm|mmmmmmm0|00000000]
@@ -274,6 +275,57 @@ End Enum
 End Structure
 
 ''' <summary>
+''' Represents the steps for grade engraving, including power and duration for two phases.
+''' </summary>
+<StructLayout(LayoutKind.Explicit)> Public Structure GradeEngraveSteps
+    ''' <summary>
+    ''' The combined 32-bit value representing the grade engraving steps.
+    ''' </summary>
+    '''   
+    ''' +-----------------------------------------------+
+    ''' | GradeEngraveSteps                             |
+    ''' +-----------------------------------------------+
+    ''' | value: Integer                                |  ' The combined 32-bit value representing the grade engraving steps.
+    ''' +-----------------------------------------------+
+    ''' | P1: Byte                                      |  ' The power level index for the first power/steps pair (refer GRDADJ).
+    ''' +-----------------------------------------------+
+    ''' | D1: Byte                                      |  ' The steps for the first power/steps pair.
+    ''' +-----------------------------------------------+
+    ''' | P2: Byte                                      |  ' The power level index for the second power/steps pair (refer GRDADJ).
+    ''' +-----------------------------------------------+
+    ''' | D2: Byte                                      |  ' The steps for the second power/steps pair.
+    ''' +-----------------------------------------------+
+    ''' 
+    <FieldOffset(0)>
+    Public value As Integer
+
+    ''' <summary>
+    ''' The power level index for the first power/steps pair (refer GRDADJ).
+    ''' </summary>
+    <FieldOffset(0)>
+    Public P1 As Byte
+
+    ''' <summary>
+    ''' The steps for the first power/steps pair.
+    ''' </summary>
+    <FieldOffset(1)>
+    Public D1 As Byte
+
+    ''' <summary>
+    ''' The power level index for the second power/steps pair (refer GRDADJ).
+    ''' </summary>
+    <FieldOffset(2)>
+    Public P2 As Byte
+
+    ''' <summary>
+    ''' The steps for the second power/steps pair.
+    ''' </summary>
+    <FieldOffset(3)>
+    Public D2 As Byte
+End Structure
+
+
+''' <summary>
 ''' The main form class for the WPF application, responsible for handling laser cutter operations, 
 ''' including reading and writing MOL files, rendering DXF files, and managing laser cutter settings and commands.
 ''' </summary>
@@ -318,6 +370,7 @@ Public Class Form1
     Private TestChunk As Integer
     Private CutChunk As Integer
     Private DrawChunks As New List(Of Integer)(10)     ' list of draw chunks
+    Private Unknownx10 As Integer
 
     ' Variables that reflect the state of the laser cutter
     ' These parameters from Machine Options - Worktable dialog
@@ -534,6 +587,7 @@ Public Class Form1
     Private Const MOL_ENGACD = &H1000346
     Private Const MOL_ENGMVY = &H2010040
     Private Const MOL_ENGMVX = &H2014040
+    Private Const MOL_ENGGRD = &H80000A46
     Private Const MOL_GRDADJ = &H80000B46
     Private Const MOL_SCALE = &H3000E46
     Private Const MOL_PWRSPD5 = &H5000E46
@@ -691,6 +745,9 @@ Public Class Form1
                 {New Parameter("??", "", GetType(Int32))},
                 {New Parameter("ramp", "Grade engrave power steps", GetType(List(Of PowerLevel)), 0.01, "%")}}
         )},
+        {MOL_ENGGRD, New MOLcmd("ENGGRD", "Grade Engraving - power profile", ParameterCount.VARIABLE, New List(Of Parameter) From {
+                {New Parameter("Power/Steps pairs", "", GetType(List(Of GradeEngraveSteps)))}}
+                )},
         {MOL_ENGACD, New MOLcmd("ENGACD", "Engraving (Ac)(De)celeration distance", ParameterCount.FIXED, New List(Of Parameter) From {
                     {New Parameter("x", "distance", GetType(Int32), 1 / xScale, "mm")}}
                     )},
@@ -808,6 +865,8 @@ Public Class Form1
         TopRight = New IntPoint(GetInt(&H18), GetInt())
         BottomLeft = New IntPoint(GetInt(&H20), GetInt())
 
+        Unknownx10 = GetInt(&H10)
+
         ' Read the chunk addresses for config, test, and cut sections
         ConfigChunk = GetInt(&H70)
         If ConfigChunk = 0 Then Throw New Exception("Config chunk is 0")
@@ -922,7 +981,6 @@ Public Class Form1
                 End If
 
                 writer.Write($" {value.Mnemonic}")
-
                 For n = 1 To cmd_len  ' number of parameters. Some commands have a variable number of parameters
                     p = value.Parameters(n - 1)     ' get the parameter
                     writer.Write($" {p.Name}=")
@@ -984,12 +1042,36 @@ Public Class Form1
                             Next
                             Exit For ' all parameters have been consumed
 
+                        Case GetType(List(Of GradeEngraveSteps))
+                            Dim parameter As GradeEngraveSteps
+                            For i = 1 To cmd_len
+                                With parameter
+                                    .value = GetInt()     ' get 32 bit word
+                                    writer.Write($" { .P1}/{ .D1}")
+                                End With
+                            Next
+                            Exit For ' all parameters have been consumed
+
                         Case Else
                             Throw New Exception($"{value.Mnemonic}: Unrecognised parameter type of {p.Typ}")
                     End Select
                 Next
             Else
                 ' UNKNOWN command. Just show parameters
+                'If cmd = &H80000A46 Then
+                '    Dim parameter As GradeEngraveSteps, TotalD1 As Integer = 0, TotalD2 As Integer = 0
+                '    writer.WriteLine()
+                '    For n = 1 To cmd_len
+                '        parameter.value = GetInt()
+                '        With parameter
+                '            TotalD1 += .D1
+                '            totalD2 += .D2
+                '            writer.WriteLine($"0x80000A46: P1 { .P1:d2} D1 { .D1:d3} P2 { .P2:d2} D2 { .D2:d2}")
+                '        End With
+                '    Next
+                '    Dim total As Integer = TotalD1 + totalD2
+                '    writer.WriteLine($"Total distance 1 {TotalD1},  2 {totalD2}, 1+2 {total} ({total / xScale:f1}mm)")
+                'Else
                 writer.Write($" Unknown: 0x{cmd:x8} Params {cmd_len}: ")
                 For i3 = 1 To cmd_len
                     n = GetInt()
@@ -997,6 +1079,7 @@ Public Class Form1
                     If n < 0 Or n > 500 Then writer.Write($" ({Float2Double(n)}f)")
                 Next
             End If
+            'End If
             writer.WriteLine() : writer.Flush()
             'reader.BaseStream.Seek(cmdBegin + cmd_len * 4 + 4,  SeekOrigin.Begin)       ' move to next command
             If cmd <> MOL_MCBLK Then MCBLKCounter -= (cmd_len + 1)
@@ -1042,7 +1125,7 @@ Public Class Form1
 
         Dim command = cmd And &HFFFFFF    ' bottom 24 bits is command
         nWords = (cmd >> 24) And &HFF  ' command length is top 8 bits
-        If nWords = &H80 Then nWords = GetInt() And &HFFFF
+        If nWords = &H80 Then nWords = GetInt() And &H1FF
         If cmd = MOL_MCBLK Then nWords = 0    ' allow contents of MCBLK to execute
         Dim param_posn = stream.Position  ' remember where parameters (if any) start
 
@@ -1146,11 +1229,11 @@ Public Class Form1
                 ' ENGMVX is in 3 phases, Accelerate, Engrave, Decelerate
                 Dim axis As Integer = GetInt()      ' consume Axis parameter
                 If axis <> Axis_Enum.X Then Throw New Exception($"MOL_ENGMVX: Axis value {axis} is not valid @0x{addr:x}")
-                Dim posn = position         ' use local copy of position
                 Dim TravelDist As Integer = GetInt()       ' the total travel distance for this operation
                 If TravelDist = 0 Then Throw New Exception($"MOL_ENGMVX: TravelDist is zero @0x{addr:x}")
                 Dim direction As Integer = CInt(Math.Sign(TravelDist))     ' 1=LtoR, -1=RtoL
                 ' Move for the initial acceleration
+                Dim posn = position         ' use local copy of position
                 Dim delta As New IntPoint(AccelLength * direction, 0)
                 DXF_line(posn, posn + delta, MoveLayer)
                 posn += delta
@@ -1174,9 +1257,9 @@ Public Class Form1
                 DXF_line(posn, posn + delta, MoveLayer)
                 posn += delta
 
-                'position += New IntPoint(TravelDist * direction, 0)
-                position = posn       ' move the position along
-                ENGLSRsteps.Clear()     ' clear the steps
+                ' Sometimes all the On/Off sequences don't add to the travel distance, so use it explicitly
+                position += New IntPoint(TravelDist, 0)
+                DXF_line(posn, position, MoveLayer)
 
             Case MOL_ENGMVY     ' Engrave move Y (laser off)
                 Dim axis = GetInt()      ' consume Axis parameter
@@ -1188,6 +1271,7 @@ Public Class Form1
                 position += delta      ' move position along
 
             Case MOL_ENGLSR     ' engraving movement
+                If nWords < 1 Then Throw New Exception($"MOL_ENGLSR: nWords is {nWords} @0x{addr:x}")
                 ENGLSRsteps.Clear()
                 For i = 1 To nWords
                     Steps.Steps = GetInt()      ' get 2 16 bit values, accessable through OnSteps & OffSteps
@@ -1266,7 +1350,7 @@ Public Class Form1
                 Dim n As Integer = GetInt()
                 dxfBlock = New Blocks.Block($"Subr {n}")
 
-            Case MOL_ACCELERATION, MOL_SETSPD, MOL_PWRSPD5, MOL_PWRSPD7, MOL_BLWRa, MOL_BLWRb, MOL_X5_FIRST, MOL_MOTION, MOL_ENGSPD1, MOL_ENGPWR1, MOL_GRDADJ
+            Case MOL_ACCELERATION, MOL_SETSPD, MOL_PWRSPD5, MOL_PWRSPD7, MOL_BLWRa, MOL_BLWRb, MOL_X5_FIRST, MOL_MOTION, MOL_ENGSPD1, MOL_ENGPWR1, MOL_GRDADJ, MOL_ENGGRD
                 ' Nothing to do
 
             Case Else
@@ -1297,11 +1381,6 @@ Public Class Form1
                 Throw New Exception($"Unknown block type at address {addr:x8}")
         End Select
     End Function
-    ' DXF_line sub with Vector2 parameters
-    'Sub DXF_line(startpoint As Vector2, endpoint As Vector2, layer As Layer, ByVal Optional color As AciColor = Nothing)
-    '    ' Add line to dxf file specified by startpoint, endpoint and layer. position is updated.
-    '    DXF_line(Vector2ToPoint(startpoint), Vector2ToPoint(endpoint), layer, color)
-    'End Sub
 
     ' DXF_line sub with IntPoint parameters
     Public Sub DXF_line(startpoint As IntPoint, endpoint As IntPoint, layer As Layer, ByVal Optional color As AciColor = Nothing)
@@ -1315,41 +1394,76 @@ Public Class Form1
         dxfBlock.Entities.Add(line)
     End Sub
 
+    ''' <summary>
+    ''' Adds a 2D polyline to the specified layer in the DXF document.
+    ''' </summary>
+    ''' <param name="Polyline">The polyline to add to the DXF document.</param>
+    ''' <param name="Layer">The layer to add the polyline to.</param>
+    ''' <param name="scale">Optional. The scale factor to apply to the polyline. Default is 1.0.</param>
     Public Sub DXF_polyline2d(Polyline As Polyline2D, Layer As Layer, Optional ByVal scale As Double = 1.0)
-        ' Add a polyline to the specified layer
+        ' Clone the polyline to avoid modifying the original
         Dim ply As Polyline2D = Polyline.Clone
+        ' Set the layer of the polyline
         ply.Layer = Layer
+        ' Apply scaling if the scale factor is not 1.0
         If scale <> 1.0 Then
+            ' Create a transformation matrix for scaling
             Dim transform As New Matrix3(scale, 0, 0, 0, scale, 0, 0, 0, scale)
+            ' Apply the transformation to the polyline
             ply.TransformBy(transform, New Vector3(0, 0, 0))
         End If
+        ' Add the polyline to the current DXF block
         dxfBlock.Entities.Add(ply)
     End Sub
 
+    ''' <summary>
+    ''' Dumps the contents of a block in hexadecimal format to the TextBox1 control.
+    ''' This method reads a block of data from the specified address in the input stream,
+    ''' and displays the hexadecimal representation of the data along with any known command mnemonics.
+    ''' </summary>
+    ''' <param name="addr">The address of the block to dump.</param>
     Public Sub HexDumpBlock(addr As Integer)
-        ' dump a block in hex
-        Dim done As Boolean = False, nWords As UInteger
-        reader.BaseStream.Seek(addr, SeekOrigin.Begin)    ' reposition to offset n
+        ' Dump a block in hex
+        Dim done As Boolean = False
+        Dim nWords As UInteger
+
+        ' Reposition the reader to the specified address
+        reader.BaseStream.Seek(addr, SeekOrigin.Begin)
+
+        ' Loop until the end of the block or the end of the stream
         While Not done And stream.Position < stream.Length
+            ' Append the current position to the TextBox1 control
             TextBox1.AppendText($"@&h{stream.Position:x8}: ")
+
+            ' Read the next 4-byte command from the input stream
             Dim cmd As UInteger = GetUInt()
             TextBox1.AppendText($" &h{cmd:x8}")
+
+            ' Exit the loop if the command is 0
             If cmd = 0 Then Exit While
+
+            ' Extract the number of words in the command
             nWords = (cmd >> 24) And &HFF
             If nWords = &H80 Then
-                nWords = GetUInt()
+                nWords = GetUInt() And &H1FF
                 TextBox1.AppendText($" &h{nWords:x8}")
             End If
+
+            ' Read and append the command parameters
             For i As Integer = 1 To nWords
                 cmd = GetUInt()
                 TextBox1.AppendText($" &h{cmd:x8}")
             Next
-            ' Display mnemonic if known
+
+            ' Display the mnemonic if the command is known
             Dim value As MOLcmd = Nothing
             If Commands.TryGetValue(cmd, value) Then TextBox1.AppendText($" ({value.Mnemonic})")
+
+            ' Append a newline to the TextBox1 control
             TextBox1.AppendText($"{vbCrLf}")
         End While
     End Sub
+
 
     Private Sub WordAccessToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles WordAccessToolStripMenuItem.Click
         Dim value As Integer, value1() As Byte
@@ -3151,7 +3265,7 @@ Public Class Form1
     Private Sub CorrelationToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CorrelationToolStripMenuItem.Click
         ' Get frequency of commands in all .MOL files
         Dim command As String, cmd As Integer, cmd_len As Integer, count As Integer = 0, Mnemonic As String = "", chunks As List(Of Integer)
-        Dim addr As Integer, fi As String = ""
+        Dim fi As String = ""
 
         Dim workingDirectory = Environment.CurrentDirectory
         Dim projectDirectory = Directory.GetParent(workingDirectory).Parent.Parent.FullName
@@ -3161,29 +3275,30 @@ Public Class Form1
         ' Get list of all unique commands in all files
         Try
             For Each fi In molFiles
-                Dim stream = System.IO.File.Open(fi, FileMode.Open)
-                reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
-                GetHeader()
-                ' Make list of chunks to be scanned
-                chunks = New List(Of Integer) From {ConfigChunk, TestChunk, CutChunk}
-                chunks.AddRange(DrawChunks)
-                For Each chunk In chunks        ' look in all chunks
-                    reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
-                    While reader.BaseStream.Position < FileSize
-                        cmd = GetInt()              ' get command
-                        If cmd = MOL_END Then Exit While        ' end of code
-                        commandFrequency.TryAdd(cmd, 0)       ' add command to dictionary if not already there
-                        cmd_len = cmd >> 24 And &HFF    ' length of command
-                        If cmd_len = &H80 Then
-                            cmd_len = GetInt() And &H1FF    ' length of command
-                        End If
-                        If cmd <> MOL_MCBLK Then For i = 1 To cmd_len : GetInt() : Next ' consume command
-                    End While
-                Next
-                reader.Close()
+                Using stream = System.IO.File.Open(fi, FileMode.Open)
+                    reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
+                    GetHeader()
+                    ' Make list of chunks to be scanned
+                    chunks = New List(Of Integer) From {ConfigChunk, TestChunk, CutChunk}
+                    chunks.AddRange(DrawChunks)
+                    For Each chunk In chunks        ' look in all chunks
+                        reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
+                        While reader.BaseStream.Position < FileSize
+                            cmd = GetInt()              ' get command
+                            If cmd = MOL_END Then Exit While        ' end of code
+                            commandFrequency.TryAdd(cmd, 0)       ' add command to dictionary if not already there
+                            cmd_len = cmd >> 24 And &HFF    ' length of command
+                            If cmd_len = &H80 Then
+                                cmd_len = GetInt() And &H1FF    ' length of command
+                            End If
+                            If cmd <> MOL_MCBLK Then For i = 1 To cmd_len : GetInt() : Next ' consume command
+                        End While
+                    Next
+                    reader.Close()
+                End Using
             Next
         Catch ex As Exception
-            Throw New Exception($"{ex.Message}{vbCrLf}File: {fi} Addr 0x{addr:x8}")
+            Throw New Exception($"{ex.Message}{vbCrLf}File: {fi} Addr 0x{reader.BaseStream.Position:x8}")
         End Try
         TextBox1.AppendText($"Unique commands found: {commandFrequency.Count}{vbCrLf}")
 
@@ -3214,9 +3329,11 @@ Public Class Form1
                             If cmd <> MOL_MCBLK Then For i = 1 To cmd_len : GetInt() : Next ' consume command
                         End While
                     Next
+                    reader.Close()
                 End Using
                 ' Save metrics
-                csvfile.WriteLine($"{fi},{MotionBlocks},{String.Join(",", commandFrequency.Values.ToArray)}")
+                'csvfile.WriteLine($"{fi},{MotionBlocks},{String.Join(",", commandFrequency.Values.ToArray)}")
+                csvfile.WriteLine($"{fi},{Unknownx10},{String.Join(",", commandFrequency.Values.ToArray)}")
             Next
         End Using
 
@@ -3255,7 +3372,7 @@ Public Class Form1
         ' Now check correlation with commands > 0.65 correlation
         Dim highCorrelations As New List(Of Integer)
         For Each kvp In correlations
-            If kvp.Value >= 0.3 Then
+            If kvp.Value >= 0.7 Then
                 Dim Key As String = Trim(kvp.Key)
                 If Key.StartsWith("0x") Then Key = Key.Remove(0, 2)         ' remove hex prefix
                 Key = Convert.ToInt32(Key, 16)
@@ -3267,28 +3384,30 @@ Public Class Form1
         TextBox1.AppendText($"High correlations: {String.Join(", ", highcorrelationsbyMnemonic.ToArray)}{vbCrLf}")
         ' Scan all files using highcorrelation list
         For Each fi In molFiles
-            Dim stream = System.IO.File.Open(fi, FileMode.Open)
-            reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
-            count = 0
-            GetHeader()
-            ' Make list of chunks to be scanned
-            chunks = New List(Of Integer) From {ConfigChunk, TestChunk, CutChunk}
-            chunks.AddRange(DrawChunks)
-            For Each chunk In chunks        ' look in all chunks
-                reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
-                While reader.BaseStream.Position < FileSize
-                    cmd = GetInt()              ' get command
-                    If cmd = MOL_END Then Exit While        ' end of code
-                    If highCorrelations.Contains(cmd) Then count += 1     ' count motion commands
-                    cmd_len = cmd >> 24 And &HFF    ' length of command
-                    If cmd_len = &H80 Then
-                        cmd_len = GetInt() And &H1FF    ' length of command
-                    End If
-                    If cmd <> MOL_MCBLK Then For i = 1 To cmd_len : GetInt() : Next ' consume command
-                End While
-            Next
-            reader.Close()
-            TextBox1.AppendText($"{fi} Motion blocks (header) = {MotionBlocks}, calculated ={count}{vbCrLf}")
+            Using stream = System.IO.File.Open(fi, FileMode.Open)
+                reader = New BinaryReader(stream, System.Text.Encoding.Unicode, False)
+                count = 0
+                GetHeader()
+                ' Make list of chunks to be scanned
+                chunks = New List(Of Integer) From {ConfigChunk, TestChunk, CutChunk}
+                chunks.AddRange(DrawChunks)
+                For Each chunk In chunks        ' look in all chunks
+                    reader.BaseStream.Position = chunk * BLOCK_SIZE         ' position the reader at the start of the chunk
+                    While reader.BaseStream.Position < FileSize
+                        cmd = GetInt()              ' get command
+                        If cmd = MOL_END Then Exit While        ' end of code
+                        If highCorrelations.Contains(cmd) Then count += 1     ' count motion commands
+                        cmd_len = cmd >> 24 And &HFF    ' length of command
+                        If cmd_len = &H80 Then
+                            cmd_len = GetInt() And &H1FF    ' length of command
+                        End If
+                        If cmd <> MOL_MCBLK Then For i = 1 To cmd_len : GetInt() : Next ' consume command
+                    End While
+                Next
+                reader.Close()
+            End Using
+            'TextBox1.AppendText($"{fi} Motion blocks (header) = {MotionBlocks}, calculated ={count}{vbCrLf}")
+            TextBox1.AppendText($"{fi} Unknownx10 (header) = {Unknownx10}, calculated ={count}{vbCrLf}")
         Next
     End Sub
 
